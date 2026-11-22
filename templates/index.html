@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Review</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="left">
+    <section class="panel"><h2>체크리스트</h2><div id="checklist" class="panel-body"></div></section>
+    <section class="panel"><h2>의심 코드</h2><div id="findings" class="panel-body"></div></section>
+    <section class="panel"><h2>코드 설명</h2><div id="explanation" class="panel-body"></div></section>
+  </div>
+  <div class="right">
+    <div class="toolbar">
+      <button type="button" id="recheck-btn">다시 검사</button>
+      <button type="button" id="download-btn">다운로드</button>
+    </div>
+    <div id="editor"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
