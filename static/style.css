@@ -57,6 +57,7 @@ body {
 .toolbar {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding: 8px 12px;
   border-bottom: 1px solid #e3e5e8;
 }
@@ -75,6 +76,77 @@ body {
   flex: 1;
   min-height: 0;
   width: 100%;
+}
+
+/* 패널 안에 채우는 검사 결과 */
+.panel-body {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.panel-body p {
+  margin: 0 0 8px;
+}
+
+.panel-body code {
+  font-family: monospace;
+}
+
+.row {
+  display: block;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-bottom: 1px solid #e3e5e8;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row[aria-pressed="true"] {
+  background: #f3f4f6;
+  font-weight: bold;
+}
+
+.row code {
+  display: block;
+  overflow: hidden;
+  font-weight: normal;
+  white-space: pre;
+  text-overflow: ellipsis;
+}
+
+.question-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e3e5e8;
+}
+
+.question-row .target {
+  flex: 1;
+}
+
+.current-answer {
+  white-space: nowrap;
+}
+
+.answer {
+  padding: 4px 12px;
+  border: 1px solid #000;
+  border-radius: 4px;
+  background: #000;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* 에디터에서 finding의 path에 해당하는 줄 */
+.marked-line {
+  background: #e3e5e8;
 }
 
 [hidden] {
