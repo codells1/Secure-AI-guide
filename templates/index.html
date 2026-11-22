@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Review</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="left">
+    <section class="panel"><h2>체크리스트</h2></section>
+    <section class="panel">
+      <h2>의심 코드</h2>
+      <div id="fix-compare" hidden>
+        <p class="fix-note" id="fix-compare-note"></p>
+        <div id="fix-top-level" hidden>
+          <p class="fix-label">파일 위쪽에 추가</p>
+          <pre id="fix-top-level-code"></pre>
+        </div>
+        <div id="fix-diff"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>코드 설명</h2>
+      <p class="fix-note">코드가 외부 AI 서비스(Anthropic)로 전송돼요.</p>
+      <div id="fix-detail" hidden>
+        <p id="fix-status" hidden></p>
+        <div id="fix-explanation" hidden>
+          <p id="fix-problem"></p>
+          <p id="fix-impact"></p>
+          <p id="fix-how"></p>
+        </div>
+        <div class="fix-prompt-head">
+          <p class="fix-label">내가 쓰던 AI에 붙여넣을 프롬프트</p>
+          <button type="button" id="fix-copy-btn">복사</button>
+        </div>
+        <pre id="fix-prompt"></pre>
+      </div>
+    </section>
+  </div>
+  <div class="right">
+    <div class="toolbar">
+      <button type="button" id="download-btn">다운로드</button>
+    </div>
+    <div id="editor"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
