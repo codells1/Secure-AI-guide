@@ -3,11 +3,171 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Code Review</title>
+  <title>내 코드 보안 점검</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+  {# 첫 화면(소개 페이지). 파일을 올리면 숨기고 아래의 작업 화면을 보여 준다 (같은 페이지 안에서 바꾼다) #}
+  <div id="landing" class="landing">
+    <header id="top" class="lp-header">
+      <div class="lp-wrap lp-header-inner">
+        <a href="#top" class="lp-logo" aria-label="맨 위로">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+        </a>
+        <nav aria-label="주요 메뉴" class="lp-nav">
+          <a href="#how">이렇게 진행돼요</a>
+          <a href="#items">점검 항목</a>
+          <a href="#privacy">안심하고 쓰세요</a>
+          <a href="#upload" class="lp-btn js-start">시작하기</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="lp-wrap lp-hero">
+        <div class="lp-hero-text">
+          <h1>AI가 만들어 준 내 코드,<br>정말 안전할까요?</h1>
+          <p class="lp-lead">내가 만든 Flask 코드에서 <strong>해킹당할 수 있는 곳</strong>을 질문을 따라가며 직접 찾고, 고치는 방법까지 알아봐요. 한 번 해 보면 다음에 코드를 만들 때 무엇을 조심해야 하는지 알게 돼요.</p>
+          {# 영역 어디를 눌러도 파일 선택 창이 열린다 (label + input). 끌어다 놓아도 된다 #}
+          <label id="upload" class="dropzone" for="file-input">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"></path><path d="M7 9l5-5 5 5"></path><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path></svg>
+            <span id="dropzone-title" class="dropzone-title" aria-live="polite">app.py 파일을 여기로 끌어다 놓으세요</span>
+            <span class="lp-btn dropzone-btn">파일 선택</span>
+            <span class="dropzone-hint">.py 파일 1개 · 설치나 로그인 없이 바로 시작해요</span>
+            <input type="file" id="file-input" class="visually-hidden" accept=".py">
+          </label>
+          <p id="landing-error" class="lp-error" role="alert" hidden></p>
+          <button type="button" id="example-btn" class="lp-link" data-src="{{ url_for('static', filename='example_app.py') }}">내 코드가 없나요? 예시 코드로 해 보기 →</button>
+        </div>
+
+        {# 실제 화면 미리보기: 그림 역할이라 눌러도 동작하지 않는다. 버튼 모양은 button이 아니라 span이다 #}
+        <div class="lp-hero-preview">
+          <div class="preview" role="img" aria-label="점검 화면 미리보기: 위험한 줄이 빨갛게 표시되고 예/아니오 질문이 나온다">
+            <div class="preview-bar">
+              <span class="preview-dot"></span><span class="preview-dot"></span><span class="preview-dot"></span>
+              <span class="preview-file">app.py</span>
+            </div>
+            <div class="preview-code">
+              <div class="preview-line"><span class="preview-mark"></span><span class="preview-no">24</span><span class="preview-src">@app.route("/search")</span></div>
+              <div class="preview-line"><span class="preview-mark"></span><span class="preview-no">25</span><span class="preview-src">def search():</span></div>
+              <div class="preview-line"><span class="preview-mark"></span><span class="preview-no">26</span><span class="preview-src">    word = request.args.get("q")</span></div>
+              <div class="preview-line preview-risk"><span class="preview-mark"></span><span class="preview-no">27</span><span class="preview-src">    cur.execute(f"... '{word}'")</span></div>
+              <div class="preview-line"><span class="preview-mark"></span><span class="preview-no">28</span><span class="preview-src">    return jsonify(cur.fetchall())</span></div>
+            </div>
+            <div class="preview-question">
+              <div class="preview-meta">SQL 삽입 · 질문 2 / 5</div>
+              <div class="preview-ask">검색창에 사용자가 직접 글자를 넣나요?</div>
+              <div class="preview-answers">
+                <span class="preview-btn preview-btn-dark">예</span>
+                <span class="preview-btn">아니오</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-band">
+        <div class="lp-wrap lp-stat">
+          <div class="lp-stat-number">45<span>%</span></div>
+          <div class="lp-stat-text">
+            <p class="lp-stat-main">AI가 만든 코드 시험에서, 잘 돌아가는 코드였지만 절반 가까이에 보안 취약점이 들어 있었어요.</p>
+            <p class="lp-stat-source">100개가 넘는 AI 모델 · 80개 코딩 과제 · Python도 38~45% — Veracode, 「2025 GenAI Code Security Report」</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="lp-wrap lp-section">
+        <h2>이렇게 진행돼요</h2>
+        <p class="lp-sub">파일 하나만 올리면, 처음부터 끝까지 혼자서 할 수 있어요.</p>
+        <div class="lp-grid">
+          <div class="lp-step">
+            <span class="lp-step-num">1</span>
+            <h3>질문에 답하며 찾기</h3>
+            <p>프로그램이 위험한 곳을 찾으면, 바로 알려 주지 않고 예/아니오 질문을 던져요. 질문을 따라가며 내 코드를 직접 살펴봐요.</p>
+          </div>
+          <div class="lp-step">
+            <span class="lp-step-num">2</span>
+            <h3>위험 확인하기</h3>
+            <p>내가 찾아본 뒤에 결과를 보여 줘요. 그대로 두면 어떤 일이 생기는지 함께 알려 줘요.</p>
+          </div>
+          <div class="lp-step">
+            <span class="lp-step-num">3</span>
+            <h3>직접 고치기</h3>
+            <p>고친 코드 예시와, 쓰던 AI에 그대로 붙여넣을 질문을 알려 줘요. 직접 고친 뒤 다시 검사하고 파일을 내려받아요.</p>
+          </div>
+        </div>
+      </section>
+
+      {# 이름은 체크리스트(main.js의 VULN_TITLES, 규칙 카드의 name)와 같게 맞춘다 #}
+      <section id="items" class="lp-band">
+        <div class="lp-wrap lp-section">
+          <h2>이런 10가지를 점검해요</h2>
+          <p class="lp-sub">웹사이트를 공개했을 때 피해가 큰 서버 쪽 문제만 골랐어요.</p>
+          <div class="lp-grid lp-grid-items">
+            <div class="lp-item"><span class="lp-item-num">01</span><h3>SQL 삽입</h3><p>검색창에 넣은 글자로 데이터베이스를 조작할 수 있어요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">02</span><h3>서버사이드 템플릿 삽입</h3><p>입력한 글자가 화면을 만드는 틀 안에서 명령처럼 실행돼요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">03</span><h3>위험한 형식 파일 업로드</h3><p>사진 대신 위험한 파일을 올릴 수 있어요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">04</span><h3>경로 조작</h3><p>서버 안의 다른 폴더에 있는 파일을 열어 볼 수 있어요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">05</span><h3>부적절한 인가 / IDOR</h3><p>주소의 번호만 바꾸면 남의 정보가 보여요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">06</span><h3>서버사이드 요청 위조</h3><p>내 서버가 엉뚱한 주소로 대신 요청을 보내요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">07</span><h3>디버그 모드·오류 정보 노출</h3><p>개발할 때 쓰던 설정이 켜진 채 공개돼요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">08</span><h3>하드코딩된 시크릿</h3><p>비밀번호나 키가 코드에 그대로 적혀 있어요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">09</span><h3>평문·약한 해시 비밀번호 저장</h3><p>회원 비밀번호를 알아보기 쉬운 모양으로 저장해요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">10</span><h3>로그인 보안: 반복된 인증시도 제한</h3><p>비밀번호를 끝없이 바꿔 넣어 볼 수 있어요.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy" class="lp-wrap lp-section">
+        <h2>안심하고 쓰세요</h2>
+        <p class="lp-sub">내 코드는 점검에만 쓰고, 남기지 않아요.</p>
+        <div class="lp-grid">
+          <div class="lp-promise">
+            <h3>코드를 실행하지 않아요</h3>
+            <p>올린 코드는 읽기만 해요. 서버에서 실행하지 않으니 내 프로그램이 망가질 일이 없어요.</p>
+          </div>
+          <div class="lp-promise">
+            <h3>저장하지 않아요</h3>
+            <p>로그인도, 데이터베이스도 없어요. 창을 닫으면 내 코드와 결과가 남지 않아요.</p>
+          </div>
+          <div class="lp-promise">
+            <h3>비밀번호·키는 가려서 보내요</h3>
+            <p>설명을 만들기 위해 코드를 외부 AI로 보내요. 프로그램이 찾은 비밀 값과 주석은 가려서 보내고, AI 회사는 보통 30일 이내에 지워요.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="lp-wrap lp-cta-wrap">
+        <div class="lp-cta">
+          <h2>공개하기 전에, 내 코드부터 점검해 볼까요?</h2>
+          <a href="#upload" class="lp-cta-btn js-start">지금 시작하기 →</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="lp-footer">
+      <div class="lp-wrap lp-footer-inner">
+        <span>제주대학교 SW융합캡스톤디자인</span>
+        <span>판정 기준: KISA Python 시큐어코딩 가이드, KISA 소프트웨어 보안약점 진단가이드, OWASP · 통계: Veracode(2025)</span>
+      </div>
+    </footer>
+  </div>
+
+  {# 작업 화면: 파일을 올린 뒤에 보인다 #}
+  <div id="workspace" class="workspace" hidden>
   <div class="left">
+    <div class="home-row">
+      <button type="button" id="home-btn" class="home-link">← 처음으로</button>
+      {# 확인은 confirm()이 아니라 화면 안의 작은 상자로 한다 #}
+      <div id="home-confirm" class="home-confirm" role="group" aria-label="처음으로 돌아가기" hidden>
+        <span>지금 점검한 내용이 사라져요. 처음으로 갈까요?</span>
+        <button type="button" id="home-yes" class="answer">예</button>
+        <button type="button" id="home-no" class="answer answer-outline">아니오</button>
+      </div>
+    </div>
     <section class="panel panel-checklist">
       <div class="panel-head">
         <h2>체크리스트</h2>
@@ -112,6 +272,7 @@
       <span class="legend-item"><span class="legend-bar"></span>위험한 줄</span>
       <span class="legend-item"><span class="legend-bar legend-viewing"></span>지금 보고 있는 줄</span>
     </div>
+  </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>

@@ -5,14 +5,24 @@
 html,
 body {
   margin: 0;
-  height: 100vh;
 }
 
 body {
+  font-family: "Noto Sans KR", system-ui, sans-serif;
+  background: #fff;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+/* 작업 화면: 화면 높이를 꽉 채우고 좌우 두 칸으로 나눈다. 첫 화면(.landing)은 파일 맨 끝에 있다 */
+.workspace {
   display: flex;
   gap: 16px;
+  height: 100vh;
   padding: 16px;
-  font-family: sans-serif;
   background: #f3f4f6;
 }
 
@@ -89,7 +99,7 @@ body {
 }
 
 .panel-body code {
-  font-family: monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 .row {
@@ -275,7 +285,7 @@ body {
 .file-name {
   margin-right: auto;
   color: #6b7280;
-  font-family: monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 13px;
 }
 
@@ -498,7 +508,7 @@ body {
   padding: 1px 5px;
   border-radius: 4px;
   background: #f3f4f6;
-  font-family: monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 13px;
 }
 
@@ -632,6 +642,7 @@ body {
   padding: 10px;
   border: 1px solid #e3e5e8;
   border-radius: 6px;
+  font-family: "JetBrains Mono", "Noto Sans KR", monospace;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -648,4 +659,671 @@ body {
 .feedback-body .copy-note {
   margin: 0;
   font-weight: bold;
+}
+
+/* ---- 작업 화면 왼쪽 위: [처음으로]와 확인 상자 ---- */
+.home-row {
+  position: relative;
+  flex: none;
+  margin-bottom: -8px;
+  font-size: 13px;
+}
+
+.home-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #52525b;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.home-link:hover {
+  color: #18181b;
+  text-decoration: underline;
+}
+
+/* 확인 상자는 링크 바로 아래에 떠서, 열고 닫아도 아래 칸이 밀리지 않는다 */
+.home-confirm {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #c9ccd1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+
+.answer-outline {
+  border-color: #c9ccd1;
+  background: #fff;
+  color: #111;
+}
+
+/* ================= 첫 화면(소개 페이지) =================
+   흰 바탕, 옅은 회색 테두리 #E4E4E7, 검정 #18181B, 본문 #3F3F46, 보조 글 #52525B·#71717A.
+   강조색은 빨간색 하나(막대·배경 #E5484D, 글자 #B42318). 그라데이션과 장식 아이콘은 쓰지 않는다. */
+html {
+  scroll-behavior: smooth;
+}
+
+.landing {
+  background: #fff;
+  color: #18181b;
+}
+
+.landing a {
+  color: #18181b;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.lp-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-right: 24px;
+  padding-left: 24px;
+}
+
+/* 상단 메뉴 (위에 고정하지 않는다) */
+.lp-header {
+  border-bottom: 1px solid #e4e4e7;
+}
+
+.lp-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.lp-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+}
+
+.lp-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 28px;
+}
+
+.lp-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #3f3f46;
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.lp-nav a:hover {
+  color: #18181b;
+  text-decoration: underline;
+}
+
+.lp-btn,
+.lp-nav a.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: #18181b;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+/* 첫 화면: 두 칸 (좁은 화면에서는 위아래로) */
+.lp-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 56px;
+  padding-top: 72px;
+  padding-bottom: 72px;
+}
+
+.lp-hero-text {
+  flex: 1 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.lp-hero h1 {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -1.5px;
+}
+
+.lp-lead {
+  margin: 0;
+  color: #3f3f46;
+  font-size: 18px;
+  line-height: 1.75;
+}
+
+.lp-lead strong {
+  color: #18181b;
+}
+
+/* 파일 올리기 영역 */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 24px;
+  border: 2px dashed #a1a1aa;
+  border-radius: 14px;
+  background: #fafafa;
+  color: #3f3f46;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropzone-title {
+  color: #18181b;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.dropzone-hint {
+  color: #71717a;
+  font-size: 13px;
+}
+
+/* 파일을 끌어 올렸을 때, [시작하기]로 데려왔을 때: 진한 검정 실선 */
+.dropzone.is-over,
+.dropzone.is-highlight {
+  border-style: solid;
+  border-color: #18181b;
+}
+
+.dropzone.is-highlight {
+  box-shadow: 0 0 0 4px rgba(24, 24, 27, 0.14);
+}
+
+.dropzone:has(input:focus-visible) {
+  outline: 2px solid #18181b;
+  outline-offset: 3px;
+}
+
+/* 살펴보는 중: 문구만 남기고 자리는 그대로 둔다 */
+.dropzone.is-busy {
+  cursor: progress;
+}
+
+.dropzone.is-busy .dropzone-btn,
+.dropzone.is-busy .dropzone-hint {
+  visibility: hidden;
+}
+
+.lp-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.lp-link {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #3f3f46;
+  font-size: 15px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.lp-link:hover {
+  color: #18181b;
+}
+
+.lp-link:disabled {
+  color: #71717a;
+  cursor: progress;
+}
+
+/* 실제 화면 미리보기 (그림 역할) */
+.lp-hero-preview {
+  flex: 1 1 440px;
+  min-width: 0;
+}
+
+.preview {
+  overflow: hidden;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(24, 24, 27, 0.1);
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e4e4e7;
+  background: #fafafa;
+}
+
+.preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e4e4e7;
+}
+
+.preview-file {
+  margin-left: 8px;
+  color: #71717a;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+
+.preview-code {
+  padding: 12px 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  line-height: 24px;
+}
+
+.preview-line {
+  display: flex;
+}
+
+.preview-mark {
+  flex: 0 0 4px;
+}
+
+.preview-no {
+  flex: 0 0 40px;
+  padding-right: 14px;
+  color: #71717a;
+  text-align: right;
+}
+
+.preview-src {
+  white-space: pre;
+}
+
+.preview-risk {
+  background: rgba(229, 72, 77, 0.14);
+}
+
+.preview-risk .preview-mark {
+  background: #e5484d;
+}
+
+.preview-risk .preview-no {
+  color: #b42318;
+  font-weight: 500;
+}
+
+.preview-question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 16px 16px;
+  padding: 16px;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+}
+
+.preview-meta {
+  color: #71717a;
+  font-size: 12px;
+}
+
+.preview-ask {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.preview-answers {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 22px;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.preview-btn-dark {
+  border-color: #18181b;
+  background: #18181b;
+  color: #fff;
+}
+
+/* 통계 띠, 점검 항목: 옅은 회색 배경 + 위아래 테두리 */
+.lp-band {
+  border-top: 1px solid #e4e4e7;
+  border-bottom: 1px solid #e4e4e7;
+  background: #fafafa;
+}
+
+.lp-stat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px 40px;
+  padding-top: 56px;
+  padding-bottom: 56px;
+}
+
+.lp-stat-number {
+  flex: none;
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.lp-stat-number span {
+  font-size: 40px;
+}
+
+.lp-stat-text {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.lp-stat-main {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.lp-stat-source {
+  margin: 0;
+  color: #52525b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 구역 공통 */
+.lp-section {
+  padding-top: 88px;
+  padding-bottom: 88px;
+}
+
+.lp-section h2 {
+  margin: 0 0 12px;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+
+.lp-sub {
+  margin: 0 0 40px;
+  color: #52525b;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.lp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.lp-grid-items {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.lp-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+}
+
+.lp-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #18181b;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.lp-step h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.lp-step p,
+.lp-promise p {
+  margin: 0;
+  color: #3f3f46;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.lp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.lp-item-num {
+  color: #71717a;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+}
+
+.lp-item h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.lp-item p {
+  margin: 0;
+  color: #3f3f46;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.lp-promise {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 4px 20px;
+  border-left: 3px solid #18181b;
+}
+
+.lp-promise h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* 마지막 안내 (검정 상자) */
+.lp-cta-wrap {
+  padding-bottom: 88px;
+}
+
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 56px 40px;
+  border-radius: 18px;
+  background: #18181b;
+}
+
+.lp-cta h2 {
+  flex: 1 1 420px;
+  min-width: 0;
+  margin: 0;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.35;
+  letter-spacing: -1px;
+}
+
+.landing a.lp-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 28px;
+  border-radius: 10px;
+  background: #fff;
+  color: #18181b;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.lp-footer {
+  border-top: 1px solid #e4e4e7;
+}
+
+.lp-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+  color: #71717a;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* 낮은 화면(노트북 1366×768): 스크롤하지 않아도 파일 올리기 영역이 보이게 여백을 줄인다 */
+@media (max-height: 800px) {
+  .lp-hero {
+    padding-top: 40px;
+    padding-bottom: 56px;
+  }
+
+  .dropzone {
+    padding: 24px;
+  }
+}
+
+/* 좁은 화면: 한 칸으로, 카드는 한 줄에 1~2개 */
+@media (max-width: 768px) {
+  .lp-nav {
+    gap: 0 20px;
+  }
+
+  .lp-hero {
+    gap: 32px;
+    padding-top: 40px;
+    padding-bottom: 56px;
+  }
+
+  .lp-hero-text,
+  .lp-hero-preview {
+    flex-basis: 100%;
+  }
+
+  .lp-hero h1 {
+    font-size: 32px;
+    letter-spacing: -0.8px;
+  }
+
+  .lp-lead {
+    font-size: 16px;
+  }
+
+  .preview-code {
+    font-size: 12px;
+  }
+
+  .preview-no {
+    flex-basis: 32px;
+    padding-right: 10px;
+  }
+
+  .lp-stat {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+
+  .lp-stat-number {
+    font-size: 56px;
+  }
+
+  .lp-stat-main {
+    font-size: 18px;
+  }
+
+  .lp-section {
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .lp-section h2,
+  .lp-cta h2 {
+    font-size: 26px;
+  }
+
+  .lp-grid-items {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+
+  .lp-cta-wrap {
+    padding-bottom: 56px;
+  }
+
+  .lp-cta {
+    padding: 36px 24px;
+  }
 }

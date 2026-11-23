@@ -52,15 +52,20 @@ require.config({
   paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' },
 });
 
-require(['vs/editor/editor.main'], () => {
-  editor = monaco.editor.create(document.getElementById('editor'), {
-    value: '',
-    language: 'python',
-    automaticLayout: true,
-    padding: { top: 12 },
-    glyphMargin: true, // 위험한 줄의 막대를 줄 번호 왼쪽에 그린다
-  });
+// 에디터가 준비되면 끝난다. 첫 화면에서 파일을 일찍 올려도 에디터를 기다렸다가 시작한다
+const editorReady = new Promise((resolve, reject) => {
+  require(['vs/editor/editor.main'], () => {
+    editor = monaco.editor.create(document.getElementById('editor'), {
+      value: '',
+      language: 'python',
+      automaticLayout: true,
+      padding: { top: 12 },
+      glyphMargin: true, // 위험한 줄의 막대를 줄 번호 왼쪽에 그린다
+    });
+    resolve();
+  }, reject);
 });
+editorReady.catch(() => {}); // 불러오지 못했다는 안내는 파일을 올릴 때 한다
 
 // 페이지 어디에 드롭해도 브라우저가 파일을 여는 기본 동작 막기
 window.addEventListener('dragover', (e) => e.preventDefault());
@@ -77,27 +82,35 @@ document.getElementById('editor').addEventListener('drop', (e) => {
   }
 
   const reader = new FileReader();
-  reader.onload = () => {
-    editor.setValue(reader.result);
-    // 새 파일을 올리면 이전 파일의 응답은 버린다
-    uploadedFileName = file.name;
-    document.getElementById('file-name').textContent = file.name;
-    fixCache.clear();
-    results = [];
-    resultsCode = null;
-    comparison = [];
-    reviewIndex = 0;
-    revealed = new Set();
-    analyzedCode = reader.result;
-    idorAnswers = new Map();
-    idorDraft = new Map();
-    ssrfAnswer = null;
-    isRecheck = false;
-    selectedVulnId = null;
-    requestAnalysis();
-  };
+  reader.onload = () => startReview(reader.result, file.name);
   reader.readAsText(file);
 });
+
+// 이전 파일의 결과와 학생 응답, 받아 둔 수정 피드백을 모두 버린다
+function resetReview() {
+  fixCache.clear();
+  currentGroups = [];
+  results = [];
+  resultsCode = null;
+  comparison = [];
+  reviewIndex = 0;
+  revealed = new Set();
+  idorAnswers = new Map();
+  idorDraft = new Map();
+  ssrfAnswer = null;
+  isRecheck = false;
+  selectedVulnId = null;
+}
+
+// 새 코드로 점검을 시작한다 (첫 화면에서 올렸을 때와 에디터에 끌어다 놓았을 때 모두)
+function startReview(code, fileName) {
+  resetReview();
+  editor.setValue(code);
+  uploadedFileName = fileName;
+  document.getElementById('file-name').textContent = fileName;
+  analyzedCode = code;
+  return requestAnalysis();
+}
 
 // 현재 에디터의 코드로 다시 검사한다. 학생 응답은 함수 이름 기준으로 유지한다 (스펙 5.1)
 document.getElementById('recheck-btn').addEventListener('click', () => {
@@ -169,12 +182,15 @@ async function requestAnalysis(compare = false) {
   try {
     output = previous ? await postRecheck(code, userInput, previous) : await postAnalysis(code, userInput);
   } catch (error) {
-    if (requestNumber === latestRequest) showNotice(FAILED_MESSAGE);
+    if (requestNumber !== latestRequest) return;
+    if (isLandingOpen()) showLandingError(FAILED_MESSAGE);
+    else showNotice(FAILED_MESSAGE);
     return;
   }
   if (requestNumber !== latestRequest) return;
 
   if (output.ok) {
+    showWorkspace(); // 첫 화면에서 올렸으면 이때 작업 화면으로 바꾼다
     resultsCode = code;
     comparison = output.comparison || [];
     if (previous) {
@@ -186,6 +202,9 @@ async function requestAnalysis(compare = false) {
     // 고칠 코드가 그대로인 묶음은 이전에 받은 것을 다시 쓰고 새로 요청하지 않는다
     requestFixes(code, output.groups || [], userInput);
     showResults(output.results);
+  } else if (isLandingOpen()) {
+    // 첫 화면에서는 작업 화면으로 넘어가지 않고, 탐지 모듈의 문구를 그대로 보여 준다 (문법 오류 등)
+    showLandingError((output.error && output.error.message) || FAILED_MESSAGE);
   } else if (output.error && output.error.line) {
     showSyntaxError(output.error);
   } else {
@@ -892,7 +911,12 @@ fixEl('feedback-next-group').addEventListener('click', () => moveFeedback({ grou
 fixEl('feedback-close').addEventListener('click', closeFeedback);
 fixEl('feedback-tip-ok').addEventListener('click', dismissTip);
 document.addEventListener('keydown', (event) => {
-  if (event.key !== 'Escape' || !feedback) return;
+  if (event.key !== 'Escape') return;
+  if (!homeConfirmEl.hidden) { // [처음으로] 확인 상자가 떠 있으면 그것만 닫는다
+    closeHomeConfirm();
+    return;
+  }
+  if (!feedback) return;
   if (isTipOpen()) dismissTip(); // 말풍선이 떠 있으면 말풍선만 닫는다
   else closeFeedback();
 });
@@ -922,3 +946,191 @@ fixEl('ask-copy').addEventListener('click', async () => {
   }
   note.hidden = false;
 });
+
+// ---- 첫 화면(소개 페이지). 파일을 올리면 같은 페이지 안에서 작업 화면으로 바뀐다 (새로고침·주소 이동 없음) ----
+const MAX_FILE_BYTES = 1024 * 1024; // 서버의 업로드 제한(app.py의 MAX_CONTENT_LENGTH)과 같다
+const DROP_TITLE = 'app.py 파일을 여기로 끌어다 놓으세요';
+const DROP_OVER_TITLE = '여기에 놓으세요';
+const BUSY_TITLE = '코드를 살펴보는 중이에요…';
+const NOT_PYTHON_MESSAGE = '파이썬(.py) 파일만 올릴 수 있어요.';
+const MANY_FILES_MESSAGE = '파일은 한 번에 1개만 올릴 수 있어요.';
+const EMPTY_FILE_MESSAGE = '빈 파일이에요. 코드가 들어 있는 파일을 올려 주세요.';
+const TOO_LARGE_MESSAGE = '파일이 너무 커요. 1MB보다 작은 파일을 올려 주세요.';
+const EXAMPLE_FILE_NAME = 'example_app.py';
+const HIGHLIGHT_MS = 2500; // [시작하기]로 데려왔을 때 파일 올리기 영역을 강조하는 시간
+
+const landingEl = document.getElementById('landing');
+const workspaceEl = document.getElementById('workspace');
+const dropzoneEl = document.getElementById('upload');
+const dropTitleEl = document.getElementById('dropzone-title');
+const fileInputEl = document.getElementById('file-input');
+const exampleBtn = document.getElementById('example-btn');
+const landingErrorEl = document.getElementById('landing-error');
+const homeBtn = document.getElementById('home-btn');
+const homeConfirmEl = document.getElementById('home-confirm');
+let landingBusy = false; // 올린 코드를 살펴보는 중
+let highlightTimer = 0;
+
+function isLandingOpen() {
+  return !landingEl.hidden;
+}
+
+function setLandingBusy(busy) {
+  landingBusy = busy;
+  dropzoneEl.classList.toggle('is-busy', busy);
+  dropzoneEl.classList.remove('is-over');
+  dropTitleEl.textContent = busy ? BUSY_TITLE : DROP_TITLE;
+  fileInputEl.disabled = busy;
+  exampleBtn.disabled = busy;
+}
+
+// 오류 문구는 role="alert" 요소에 넣는다. 다시 올리면 지운다
+function showLandingError(text) {
+  setLandingBusy(false);
+  landingErrorEl.textContent = text;
+  landingErrorEl.hidden = false;
+}
+
+function clearLandingError() {
+  landingErrorEl.textContent = '';
+  landingErrorEl.hidden = true;
+}
+
+// 첫 화면 → 작업 화면. 검사에 성공했을 때 requestAnalysis가 부른다
+function showWorkspace() {
+  if (!isLandingOpen()) return;
+  landingEl.hidden = true;
+  workspaceEl.hidden = false;
+  setLandingBusy(false);
+  window.scrollTo(0, 0);
+  editor.layout(); // 숨겨져 있던 에디터의 크기를 바로 다시 잰다
+}
+
+// 작업 화면 → 첫 화면. 점검하던 내용은 모두 버린다
+function showLanding() {
+  latestRequest += 1; // 아직 오지 않은 응답은 버린다
+  closeHomeConfirm();
+  resetReview();
+  analyzedCode = '';
+  uploadedFileName = 'app.py';
+  document.getElementById('file-name').textContent = '';
+  showNotice(''); // 팝업을 닫고 체크리스트·의심 코드·코드 설명과 에디터의 표시를 비운다
+  editor.setValue('');
+  workspaceEl.hidden = true;
+  landingEl.hidden = false;
+  clearLandingError();
+  setLandingBusy(false);
+  window.scrollTo(0, 0);
+}
+
+function pickFiles(files) {
+  clearLandingError();
+  if (files.length === 0) return;
+  if (files.length > 1) {
+    showLandingError(MANY_FILES_MESSAGE);
+    return;
+  }
+  const file = files[0];
+  if (!ALLOWED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))) {
+    showLandingError(NOT_PYTHON_MESSAGE);
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    showLandingError(TOO_LARGE_MESSAGE);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => startFromLanding(reader.result, file.name);
+  reader.onerror = () => showLandingError(FAILED_MESSAGE);
+  reader.readAsText(file);
+}
+
+// 올린 파일과 예시 파일 모두 여기로 온다.
+// 검사에 성공하면 requestAnalysis가 작업 화면으로 바꾸고, 문법 오류 등은 첫 화면에 문구로 남긴다
+async function startFromLanding(code, fileName) {
+  if (!code.trim()) {
+    showLandingError(EMPTY_FILE_MESSAGE);
+    return;
+  }
+  setLandingBusy(true);
+  try {
+    await editorReady;
+  } catch {
+    showLandingError(FAILED_MESSAGE);
+    return;
+  }
+  startReview(code, fileName);
+}
+
+['dragenter', 'dragover'].forEach((type) => {
+  dropzoneEl.addEventListener(type, (event) => {
+    event.preventDefault();
+    if (landingBusy) return;
+    dropzoneEl.classList.add('is-over');
+    dropTitleEl.textContent = DROP_OVER_TITLE;
+  });
+});
+
+function leaveDropzone() {
+  dropzoneEl.classList.remove('is-over');
+  if (!landingBusy) dropTitleEl.textContent = DROP_TITLE;
+}
+
+dropzoneEl.addEventListener('dragleave', (event) => {
+  if (dropzoneEl.contains(event.relatedTarget)) return; // 영역 안의 다른 요소로 옮겨 간 것은 나간 것이 아니다
+  leaveDropzone();
+});
+
+dropzoneEl.addEventListener('drop', (event) => {
+  event.preventDefault();
+  leaveDropzone();
+  if (!landingBusy) pickFiles(event.dataTransfer.files);
+});
+
+fileInputEl.addEventListener('change', () => {
+  const files = [...fileInputEl.files]; // 아래에서 값을 비우면 목록도 비워지므로 먼저 꺼낸다
+  fileInputEl.value = ''; // 같은 파일을 다시 골라도 change가 일어나게 한다
+  pickFiles(files);
+});
+
+// [예시 코드로 해 보기]: 저장소의 예시 파일을 불러와 올린 것과 똑같이 진행한다
+exampleBtn.addEventListener('click', async () => {
+  clearLandingError();
+  setLandingBusy(true);
+  let code;
+  try {
+    const response = await fetch(exampleBtn.dataset.src);
+    if (!response.ok) throw new Error('example');
+    code = await response.text();
+  } catch {
+    showLandingError(FAILED_MESSAGE);
+    return;
+  }
+  startFromLanding(code, EXAMPLE_FILE_NAME);
+});
+
+// 상단 [시작하기]와 하단 [지금 시작하기 →]: 파일 올리기 영역으로 데려가서 잠깐 강조한다
+document.querySelectorAll('.js-start').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    dropzoneEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    dropzoneEl.classList.add('is-highlight');
+    clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => dropzoneEl.classList.remove('is-highlight'), HIGHLIGHT_MS);
+    fileInputEl.focus({ preventScroll: true }); // 키보드로 바로 파일을 고를 수 있게
+  });
+});
+
+// 작업 화면의 [처음으로]: 화면 안의 작은 상자로 한 번 확인한다
+function closeHomeConfirm() {
+  if (homeConfirmEl.hidden) return;
+  homeConfirmEl.hidden = true;
+  homeBtn.focus();
+}
+
+homeBtn.addEventListener('click', () => {
+  homeConfirmEl.hidden = false;
+  document.getElementById('home-no').focus();
+});
+document.getElementById('home-no').addEventListener('click', closeHomeConfirm);
+document.getElementById('home-yes').addEventListener('click', showLanding);
