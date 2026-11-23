@@ -1,0 +1,131 @@
+{
+  "vuln_id": "ssti",
+  "name": "서버사이드 템플릿 삽입",
+  "concept": [
+    {
+      "question": "'템플릿'이 뭐예요?",
+      "answer": "화면을 찍어 내는 틀이에요. 틀에는 '여기에 이름을 넣어 줘' 같은 빈칸이 있고, 프로그램이 그 빈칸을 채워서 화면을 만들어요. 사용자가 쓴 글이 빈칸이 아니라 틀 자체에 섞이면, 그 글이 틀의 명령처럼 읽힐 수 있어요.",
+      "rule_ids": [
+        "SSTI-1",
+        "SSTI-2",
+        "SSTI-3",
+        "SSTI-4"
+      ],
+      "_review": true
+    }
+  ],
+  "rules": {
+    "SSTI-1": {
+      "key_sentence": "템플릿 원본은 고정해 두고, 사용자 값은 변수로만 넘긴다.",
+      "reference": {
+        "source": "OWASP Server-Side Template Injection Prevention Cheat Sheet",
+        "pages": "",
+        "excerpt": "매개변수화된 쿼리가 데이터를 SQL 문장 밖에 두는 것과 같은 방식으로, 고정된 템플릿을 렌더링하고 사용자 값은 이름 붙인 변수로 넘긴다.",
+        "excerpt_source": "OWASP 「서버사이드 템플릿 삽입 방지 안내서」의 '믿을 수 없는 입력은 데이터로만 넘기기' 부분",
+        "easy": "화면 틀은 고정해 두고, 사용자가 쓴 글은 이름 붙인 값으로만 넘기라는 뜻이에요. 그러면 그 글이 틀의 명령으로 읽히지 않아요.",
+        "excerpt_original_source": "OWASP Server-Side Template Injection Prevention Cheat Sheet, 'Pass untrusted input only as data'",
+        "excerpt_original": "Render a fixed template and pass user values as named variables, the same way a parameterized query keeps data out of SQL."
+      },
+      "allowed_fixes": [
+        "템플릿 원본은 고정하고(템플릿 파일 + `render_template`), 값은 키워드 인자로만 넘긴다"
+      ],
+      "forbidden_fixes": [
+        "`{{`, `{%`를 지우는 필터"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask, request, render_template_string\n\napp = Flask(__name__)\n\n\n@app.route(\"/hello\")\ndef hello():\n    name = request.args.get(\"name\", \"\")\n    return render_template_string(\"<h1>안녕, \" + name + \"</h1>\")\n",
+        "after": "from flask import Flask, request, render_template\n\napp = Flask(__name__)\n\n\n@app.route(\"/hello\")\ndef hello():\n    name = request.args.get(\"name\", \"\")\n    # templates/hello.html 파일에 화면 틀을 고정해 둔다.\n    return render_template(\"hello.html\", name=name)\n"
+      },
+      "fallback_explanation": {
+        "problem": "사용자가 입력한 값을 화면 틀에 그대로 이어 붙이고 있어요.",
+        "impact": "서버 안의 정보가 화면에 나오거나 서버에서 원하지 않는 코드가 실행될 수 있어요. 입력한 글자가 틀의 명령으로 읽히기 때문이에요.",
+        "how_to_fix": "화면 틀은 템플릿 파일에 고정해 둬요. 값은 render_template()에 이름을 붙여 따로 넘겨요."
+      },
+      "_review": true
+    },
+    "SSTI-2": {
+      "key_sentence": "템플릿 파일 이름은 미리 정해 둔 목록에서만 고른다.",
+      "reference": {
+        "source": "OWASP Server-Side Template Injection Prevention Cheat Sheet",
+        "pages": "",
+        "excerpt": "템플릿은 애플리케이션 소스와 함께 두고, 템플릿을 바꿀 때는 코드처럼 검토하며, 믿을 수 없는 데이터로 템플릿을 만들지 않는다.",
+        "excerpt_source": "OWASP 「서버사이드 템플릿 삽입 방지 안내서」의 '템플릿을 코드처럼 다루기' 부분",
+        "easy": "템플릿은 프로그램의 코드처럼 프로그램과 함께 두고, 믿을 수 없는 값으로 만들지 말라는 뜻이에요. 그래서 보여 줄 템플릿도 미리 정해 둔 것 중에서만 골라요.",
+        "excerpt_original_source": "OWASP Server-Side Template Injection Prevention Cheat Sheet, 'Treat templates as code'",
+        "excerpt_original": "Keep templates with the application source, review changes to them like code, and never build them from untrusted data."
+      },
+      "allowed_fixes": [
+        "템플릿 이름은 ① 상수 dict에서 고르거나 ② 상수 목록에 없으면 중단한다"
+      ],
+      "forbidden_fixes": [
+        "입력값으로 파일 이름 만들기"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask, request, render_template\n\napp = Flask(__name__)\n\n\n@app.route(\"/page\")\ndef page():\n    name = request.args.get(\"name\", \"home\")\n    return render_template(name + \".html\")\n",
+        "after": "from flask import Flask, request, render_template\n\napp = Flask(__name__)\nPAGES = {\"home\": \"home.html\", \"about\": \"about.html\"}\n\n\n@app.route(\"/page\")\ndef page():\n    template = PAGES.get(request.args.get(\"name\"), \"home.html\")\n    return render_template(template)\n"
+      },
+      "fallback_explanation": {
+        "problem": "사용자가 입력한 값으로 보여 줄 템플릿 파일의 이름을 정하고 있어요.",
+        "impact": "감춰 둔 다른 화면이 열릴 수 있어요. 보여 주려던 것이 아닌 템플릿 파일을 고를 수 있기 때문이에요.",
+        "how_to_fix": "보여 줄 수 있는 템플릿 파일을 미리 목록으로 정해 둬요. 입력값은 그 목록에서 고르는 데만 써요."
+      },
+      "_review": true
+    },
+    "SSTI-3": {
+      "key_sentence": "템플릿 문법을 지우는 필터로 막지 않고, 템플릿 원본을 고정하고 값을 변수로 넘긴다.",
+      "reference": {
+        "source": "OWASP Server-Side Template Injection Prevention Cheat Sheet",
+        "pages": "",
+        "excerpt": "입력값에서 템플릿 문법을 걸러 내려고 하지 않는다.",
+        "excerpt_source": "OWASP 「서버사이드 템플릿 삽입 방지 안내서」의 '소개' 부분",
+        "easy": "입력값에서 템플릿 기호를 지우는 방법으로 막으려 하지 말라는 뜻이에요. 대신 화면 틀을 고정하고 값은 따로 넘겨요.",
+        "excerpt_original_source": "OWASP Server-Side Template Injection Prevention Cheat Sheet, 'Introduction'",
+        "excerpt_original": "Do not try to filter template syntax out of input."
+      },
+      "allowed_fixes": [
+        "템플릿 원본은 고정하고(템플릿 파일 + `render_template`), 값은 키워드 인자로만 넘긴다"
+      ],
+      "forbidden_fixes": [
+        "`{{`, `{%`를 지우는 필터"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask, request, render_template_string\n\napp = Flask(__name__)\n\n\n@app.route(\"/hello\")\ndef hello():\n    name = request.args.get(\"name\", \"\")\n    name = name.replace(\"{{\", \"\").replace(\"}}\", \"\")\n    return render_template_string(\"<h1>안녕, \" + name + \"</h1>\")\n",
+        "after": "from flask import Flask, request, render_template\n\napp = Flask(__name__)\n\n\n@app.route(\"/hello\")\ndef hello():\n    name = request.args.get(\"name\", \"\")\n    # templates/hello.html 파일에 화면 틀을 고정해 둔다.\n    return render_template(\"hello.html\", name=name)\n"
+      },
+      "fallback_explanation": {
+        "problem": "입력값에서 템플릿 기호만 지운 뒤 화면 틀에 이어 붙이고 있어요.",
+        "impact": "기호를 지워도 입력한 글자가 틀의 명령으로 읽힐 수 있어요. 지우는 방식은 빠져나갈 방법이 많기 때문이에요.",
+        "how_to_fix": "기호를 지우는 코드는 빼고, 화면 틀을 템플릿 파일에 고정해 둬요. 값은 render_template()에 이름을 붙여 따로 넘겨요."
+      },
+      "_review": true
+    },
+    "SSTI-4": {
+      "key_sentence": "파일이나 DB에서 읽은 값도 템플릿 원본에 넣지 않고 변수로 넘긴다.",
+      "reference": {
+        "source": "OWASP Server-Side Template Injection Prevention Cheat Sheet",
+        "pages": "",
+        "excerpt": "매개변수화된 쿼리가 데이터를 SQL 문장 밖에 두는 것과 같은 방식으로, 고정된 템플릿을 렌더링하고 사용자 값은 이름 붙인 변수로 넘긴다.",
+        "excerpt_source": "OWASP 「서버사이드 템플릿 삽입 방지 안내서」의 '믿을 수 없는 입력은 데이터로만 넘기기' 부분",
+        "easy": "화면 틀은 고정해 두고, 사용자가 쓴 글은 이름 붙인 값으로만 넘기라는 뜻이에요. 그러면 그 글이 틀의 명령으로 읽히지 않아요.",
+        "excerpt_original_source": "OWASP Server-Side Template Injection Prevention Cheat Sheet, 'Pass untrusted input only as data'",
+        "excerpt_original": "Render a fixed template and pass user values as named variables, the same way a parameterized query keeps data out of SQL."
+      },
+      "allowed_fixes": [
+        "템플릿 원본은 고정하고(템플릿 파일 + `render_template`), 값은 키워드 인자로만 넘긴다"
+      ],
+      "forbidden_fixes": [
+        "`{{`, `{%`를 지우는 필터"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask, render_template_string\n\napp = Flask(__name__)\n\n\n@app.route(\"/notice\")\ndef notice():\n    with open(\"notice.txt\", encoding=\"utf-8\") as file:\n        text = file.read()\n    return render_template_string(\"<p>\" + text + \"</p>\")\n",
+        "after": "from flask import Flask, render_template\n\napp = Flask(__name__)\n\n\n@app.route(\"/notice\")\ndef notice():\n    with open(\"notice.txt\", encoding=\"utf-8\") as file:\n        text = file.read()\n    # templates/notice.html 파일에 화면 틀을 고정해 둔다.\n    return render_template(\"notice.html\", text=text)\n"
+      },
+      "fallback_explanation": {
+        "problem": "파일이나 데이터베이스에서 읽은 값을 화면 틀에 그대로 이어 붙이고 있어요.",
+        "impact": "서버에서 원하지 않는 동작이 일어날 수 있어요. 읽어 온 값에 틀의 명령으로 읽히는 글자가 들어 있을 수 있기 때문이에요.",
+        "how_to_fix": "화면 틀은 템플릿 파일에 고정해 둬요. 읽어 온 값은 render_template()에 이름을 붙여 따로 넘겨요."
+      },
+      "_review": true
+    }
+  }
+}

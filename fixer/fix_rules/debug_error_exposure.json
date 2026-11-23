@@ -1,0 +1,130 @@
+{
+  "vuln_id": "debug_error_exposure",
+  "name": "디버그 모드·오류 정보 노출",
+  "concept": [
+    {
+      "question": "디버그 모드가 뭐예요?",
+      "answer": "프로그램을 만드는 사람만 쓰는 '공사 중 비상문'이에요. 오류가 나면 어디가 잘못됐는지 자세히 보여 주고, 그 화면에서 바로 이것저것 시험해 볼 수 있게 해 줘요. 만들 때는 편리하지만, 사이트를 공개할 때는 꼭 닫아야 해요.",
+      "rule_ids": [
+        "DBG-1",
+        "DBG-2"
+      ],
+      "_review": true
+    },
+    {
+      "question": "오류 내용을 왜 보여 주면 안 돼요?",
+      "answer": "오류 내용에는 파일 위치, 코드 조각, 데이터베이스 구조 같은 서버 안쪽 정보가 들어 있어요. 만드는 사람에게는 고칠 단서지만, 다른 사람에게는 서버의 약한 곳을 알려 주는 쪽지가 돼요. 그래서 사용자에게는 정해 둔 안내 문구만 보여 줘요.",
+      "rule_ids": [
+        "ERR-1",
+        "ERR-2"
+      ],
+      "_review": true
+    }
+  ],
+  "rules": {
+    "DBG-1": {
+      "key_sentence": "디버그 모드는 debug=False로 꺼 둔다.",
+      "reference": {
+        "source": "Flask 공식 문서, KISA 「제거되지 않고 남은 디버그 코드」",
+        "pages": "",
+        "excerpt": "DEBUG 모드를 사용하면 브라우저에서 임의의 파이썬 코드를 실행할 수도 있고 파이썬에서 발생한 모든 오류가 출력되어 정보 노출의 위험이 있다. 어플리케이션을 배포 전에 반드시 DEBUG 모드를 비활성화 해야 한다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「제거되지 않고 남은 디버그 코드」 146쪽",
+        "easy": "디버그 모드가 켜져 있으면 다른 사람이 브라우저에서 내 서버에 명령을 내릴 수 있다는 뜻이에요. 그래서 사이트를 공개하기 전에 꼭 꺼야 해요."
+      },
+      "allowed_fixes": [
+        "`debug` 인자를 지우거나 `debug=False`로 고정"
+      ],
+      "forbidden_fixes": [
+        "환경변수로 켜고 끄기"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask\n\napp = Flask(__name__)\n\n\n@app.route(\"/\")\ndef index():\n    return \"안녕하세요\"\n\n\nif __name__ == \"__main__\":\n    app.run(debug=True)\n",
+        "after": "from flask import Flask\n\napp = Flask(__name__)\n\n\n@app.route(\"/\")\ndef index():\n    return \"안녕하세요\"\n\n\nif __name__ == \"__main__\":\n    app.run(debug=False)\n"
+      },
+      "fallback_explanation": {
+        "problem": "디버그 모드가 켜진 채로 프로그램을 실행하고 있어요.",
+        "impact": "방문한 누구나 오류 화면에서 내 서버에 명령을 내릴 수 있어요. 공사가 끝난 가게에 비상문을 열어 둔 채 손님을 받는 것과 같아요.",
+        "how_to_fix": "app.run()의 debug 값을 False로 바꿔요."
+      },
+      "_review": true
+    },
+    "DBG-2": {
+      "key_sentence": "디버그 모드는 환경변수로 정하지 않고 debug=False로 고정한다.",
+      "reference": {
+        "source": "Flask 공식 문서, KISA 「제거되지 않고 남은 디버그 코드」",
+        "pages": "",
+        "excerpt": "DEBUG 모드를 사용하면 브라우저에서 임의의 파이썬 코드를 실행할 수도 있고 파이썬에서 발생한 모든 오류가 출력되어 정보 노출의 위험이 있다. 어플리케이션을 배포 전에 반드시 DEBUG 모드를 비활성화 해야 한다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「제거되지 않고 남은 디버그 코드」 146쪽",
+        "easy": "디버그 모드가 켜져 있으면 다른 사람이 브라우저에서 내 서버에 명령을 내릴 수 있다는 뜻이에요. 그래서 사이트를 공개하기 전에 꼭 꺼야 해요."
+      },
+      "allowed_fixes": [
+        "`debug` 인자를 지우거나 `debug=False`로 고정"
+      ],
+      "forbidden_fixes": [
+        "환경변수로 켜고 끄기"
+      ],
+      "fallback_example": {
+        "before": "import os\nfrom flask import Flask\n\napp = Flask(__name__)\n\n\n@app.route(\"/\")\ndef index():\n    return \"안녕하세요\"\n\n\nif __name__ == \"__main__\":\n    app.run(debug=os.environ.get(\"FLASK_DEBUG\") == \"1\")\n",
+        "after": "from flask import Flask\n\napp = Flask(__name__)\n\n\n@app.route(\"/\")\ndef index():\n    return \"안녕하세요\"\n\n\nif __name__ == \"__main__\":\n    app.run(debug=False)\n"
+      },
+      "fallback_explanation": {
+        "problem": "디버그 모드를 켤지 말지를 코드 밖의 값에 맡기고 있어요.",
+        "impact": "그 값이 잘못 들어가면 방문한 누구나 오류 화면에서 내 서버에 명령을 내릴 수 있어요. 코드만 봐서는 꺼져 있는지 알 수 없기 때문이에요.",
+        "how_to_fix": "app.run()의 debug 값을 False로 고정해요. 그러면 어떤 경우에도 꺼져 있어요."
+      },
+      "_review": true
+    },
+    "ERR-1": {
+      "key_sentence": "오류가 나면 오류 내용 대신 정해 둔 안내 문구만 돌려준다.",
+      "reference": {
+        "source": "KISA 「오류 메시지 정보노출」",
+        "pages": "",
+        "excerpt": "소스코드에서 예외 상황은 내부적으로 처리하고 사용자에게 시스템 내부 정보 등 민감한 정보를 포함하는 오류를 출력하지 않고 미리 정의된 메시지를 제공하도록 설정한다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「오류 메시지 정보노출」 125쪽",
+        "easy": "오류가 나면 자세한 내용은 프로그램 안에서만 처리하고, 사용자에게는 미리 정해 둔 안내 문구만 보여 주라는 뜻이에요."
+      },
+      "allowed_fixes": [
+        "오류가 나면 정해 둔 안내 문구만 돌려주고, traceback 출력은 지움"
+      ],
+      "forbidden_fixes": [
+        "`return str(e)`"
+      ],
+      "fallback_example": {
+        "before": "from flask import Flask, request\n\napp = Flask(__name__)\n\n\n@app.route(\"/divide\")\ndef divide():\n    try:\n        a = int(request.args.get(\"a\", \"1\"))\n        b = int(request.args.get(\"b\", \"1\"))\n        return str(a / b)\n    except Exception as e:\n        return str(e), 400\n",
+        "after": "from flask import Flask, request\n\napp = Flask(__name__)\n\n\n@app.route(\"/divide\")\ndef divide():\n    try:\n        a = int(request.args.get(\"a\", \"1\"))\n        b = int(request.args.get(\"b\", \"1\"))\n        return str(a / b)\n    except Exception:\n        return \"계산하지 못했어요. 숫자를 확인해 주세요.\", 400\n"
+      },
+      "fallback_explanation": {
+        "problem": "오류가 났을 때 오류 내용을 사용자 화면에 그대로 돌려주고 있어요.",
+        "impact": "파일 위치나 데이터베이스 구조 같은 서버 안쪽 정보가 드러날 수 있어요. 오류 내용에는 그런 정보가 섞여 있기 때문이에요.",
+        "how_to_fix": "오류가 나면 미리 정해 둔 안내 문구만 돌려줘요."
+      },
+      "_review": true
+    },
+    "ERR-2": {
+      "key_sentence": "오류 추적 정보(traceback)를 출력하는 코드는 지운다.",
+      "reference": {
+        "source": "KISA 「오류 메시지 정보노출」",
+        "pages": "",
+        "excerpt": "예외발생 시 예외 이름이나 추적 메시지(traceback)를 출력하는 경우 프로그램 내부 구조를 쉽게 파악할 수 있기 때문이다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「오류 메시지 정보노출」 125쪽",
+        "easy": "오류가 난 위치와 순서를 그대로 출력하면, 그것을 본 사람이 프로그램 안쪽이 어떻게 생겼는지 알 수 있다는 뜻이에요. 그래서 그런 출력은 지워요."
+      },
+      "allowed_fixes": [
+        "오류가 나면 정해 둔 안내 문구만 돌려주고, traceback 출력은 지움"
+      ],
+      "forbidden_fixes": [
+        "`return str(e)`"
+      ],
+      "fallback_example": {
+        "before": "import traceback\nfrom flask import Flask, request\n\napp = Flask(__name__)\n\n\n@app.route(\"/divide\")\ndef divide():\n    try:\n        a = int(request.args.get(\"a\", \"1\"))\n        b = int(request.args.get(\"b\", \"1\"))\n        return str(a / b)\n    except Exception:\n        traceback.print_exc()\n        return \"계산하지 못했어요. 숫자를 확인해 주세요.\", 400\n",
+        "after": "from flask import Flask, request\n\napp = Flask(__name__)\n\n\n@app.route(\"/divide\")\ndef divide():\n    try:\n        a = int(request.args.get(\"a\", \"1\"))\n        b = int(request.args.get(\"b\", \"1\"))\n        return str(a / b)\n    except Exception:\n        return \"계산하지 못했어요. 숫자를 확인해 주세요.\", 400\n"
+      },
+      "fallback_explanation": {
+        "problem": "오류가 났을 때 오류가 난 코드의 위치와 순서를 그대로 출력하고 있어요.",
+        "impact": "코드의 구조와 파일 위치 같은 서버 안쪽 정보가 드러날 수 있어요. 출력된 내용이 다른 사람 눈에 띌 수 있기 때문이에요.",
+        "how_to_fix": "그 내용을 출력하는 줄을 지워요. 사용자에게는 정해 둔 안내 문구만 돌려줘요."
+      },
+      "_review": true
+    }
+  }
+}

@@ -8,44 +8,110 @@
 </head>
 <body>
   <div class="left">
-    <section class="panel"><h2>체크리스트</h2><div id="checklist" class="panel-body"></div></section>
-    <section class="panel">
-      <h2>의심 코드</h2>
-      <div id="findings" class="panel-body"></div>
-      <div id="fix-compare" hidden>
-        <p class="fix-note" id="fix-compare-note"></p>
-        <div id="fix-top-level" hidden>
-          <p class="fix-label">파일 위쪽에 추가</p>
-          <pre id="fix-top-level-code"></pre>
-        </div>
-        <div id="fix-diff"></div>
+    <section class="panel panel-checklist">
+      <div class="panel-head">
+        <h2>체크리스트</h2>
+        <span id="review-progress" class="progress-text"></span>
       </div>
+      <div id="checklist" class="panel-body"></div>
     </section>
-    <section class="panel">
-      <h2>코드 설명</h2>
-      <div id="explanation" class="panel-body"></div>
-      <p class="fix-note">코드가 외부 AI 서비스(Anthropic)로 전송돼요.</p>
-      <div id="fix-detail" hidden>
-        <p id="fix-status" hidden></p>
-        <div id="fix-explanation" hidden>
-          <p id="fix-problem"></p>
-          <p id="fix-impact"></p>
-          <p id="fix-how"></p>
+    <div class="lower">
+      <section class="panel">
+        <h2>의심 코드</h2>
+        <div id="findings" class="panel-body"></div>
+      </section>
+      <section class="panel">
+        <h2>코드 설명</h2>
+        <div id="explanation" class="panel-body"></div>
+      </section>
+
+      {# 피드백 팝업: 체크리스트 아래 영역 위에 뜬다. 오른쪽 에디터는 가리지 않고 배경도 덮지 않는다 #}
+      <section id="feedback" class="feedback" role="dialog" aria-labelledby="feedback-title" tabindex="-1" hidden>
+        <header class="feedback-head">
+          <h2 id="feedback-title"></h2>
+          <div id="feedback-groups" class="feedback-groups" hidden>
+            <button type="button" id="feedback-prev-group" class="icon-btn" aria-label="이전 위치">◀</button>
+            <span id="feedback-group-count"><strong id="feedback-group-number"></strong>곳</span>
+            <button type="button" id="feedback-next-group" class="icon-btn" aria-label="다음 위치">▶</button>
+          </div>
+          <button type="button" id="feedback-close" class="close-btn" aria-label="닫기">×</button>
+        </header>
+        {# 말풍선: 같은 취약점이 여러 곳일 때 ◀ ▶를 가리킨다. 자기 줄을 차지해서 단계 버튼과 설명을 가리지 않는다 #}
+        <div id="feedback-tip" class="tip-row" hidden>
+          <div class="tip">
+            <div id="feedback-tip-text" class="tip-text">
+              <strong id="feedback-tip-count"></strong>
+              <span>이 화살표로 하나씩 넘겨 볼 수 있어요.</span>
+            </div>
+            <button type="button" id="feedback-tip-ok" class="answer" aria-describedby="feedback-tip-text">알겠어요</button>
+          </div>
         </div>
-        <div class="fix-prompt-head">
-          <p class="fix-label">내가 쓰던 AI에 붙여넣을 프롬프트</p>
-          <button type="button" id="fix-copy-btn">복사</button>
+        <div class="feedback-steps">
+          <button type="button" class="step" data-step="0">1. 왜 위험해요?</button>
+          <button type="button" class="step" data-step="1">2. 이렇게 고쳐요</button>
+          <button type="button" class="step" data-step="2">3. AI에게 물어보기</button>
         </div>
-        <pre id="fix-prompt"></pre>
-      </div>
-    </section>
+        <div class="feedback-body">
+          <p id="feedback-status" class="feedback-status" role="status" hidden>
+            <span id="feedback-spinner" class="spinner"></span><span id="feedback-status-text"></span>
+          </p>
+
+          <div id="step-why" hidden>
+            <div id="why-problems"></div>
+            <button type="button" id="why-line-btn" class="ghost-btn"></button>
+            <hr>
+            <p class="small-label">그대로 두면?</p>
+            <div id="why-impacts"></div>
+            <hr>
+            <div id="why-concepts"></div>
+            <details class="reference">
+              <summary>근거 자료</summary>
+              <div id="why-references"></div>
+            </details>
+          </div>
+
+          <div id="step-fix" hidden>
+            <p id="fix-general" class="general-note" hidden>일반 예시예요 (내 코드가 아니에요)</p>
+            <div id="fix-how"></div>
+            <div id="feedback-diff"></div>
+            <p class="fix-note">예시예요. 내 코드에 자동으로 바뀌지 않아요.</p>
+            <div id="fix-top-level" hidden>
+              <p class="fix-note">파일 맨 위에 이것도 추가해요:</p>
+              <pre id="fix-top-level-code"></pre>
+            </div>
+          </div>
+
+          <div id="step-ask" hidden>
+            <p>이 문장을 복사해서, 코드를 만들 때 쓰던 AI(ChatGPT, Claude 등)의 새 대화창에 붙여넣어 보세요.</p>
+            <pre id="ask-preview" class="prompt-preview"></pre>
+            <div class="ask-actions">
+              <button type="button" id="ask-copy" class="big-btn">복사하기</button>
+              <p id="ask-copied" class="copy-note" role="status" hidden></p>
+            </div>
+            <details id="ask-full">
+              <summary>전체 보기</summary>
+              <pre id="ask-prompt"></pre>
+            </details>
+          </div>
+        </div>
+        <footer class="feedback-foot">
+          <button type="button" id="feedback-prev" class="ghost-btn">◀ 이전</button>
+          <button type="button" id="feedback-next" class="big-btn">다음 ▶</button>
+        </footer>
+      </section>
+    </div>
   </div>
   <div class="right">
     <div class="toolbar">
+      <span id="file-name" class="file-name"></span>
       <button type="button" id="recheck-btn">다시 검사</button>
-      <button type="button" id="download-btn">다운로드</button>
+      <button type="button" id="download-btn" hidden>다운로드</button>
     </div>
     <div id="editor"></div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-bar"></span>위험한 줄</span>
+      <span class="legend-item"><span class="legend-bar legend-viewing"></span>지금 보고 있는 줄</span>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>

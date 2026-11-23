@@ -1,0 +1,42 @@
+{
+  "vuln_id": "path_traversal",
+  "name": "경로 조작",
+  "concept": [
+    {
+      "question": "'파일 경로'가 뭐예요?",
+      "answer": "파일이 어느 폴더 안에 있는지 알려 주는 주소예요. 사물함 번호처럼, 경로를 알면 그 파일을 찾아 열 수 있어요. 사용자가 경로를 마음대로 적을 수 있으면, 열어 주려던 폴더 밖의 파일까지 가리킬 수 있어요.",
+      "rule_ids": [
+        "PATH-1"
+      ],
+      "_review": true
+    }
+  ],
+  "rules": {
+    "PATH-1": {
+      "key_sentence": "사용자가 입력한 파일 이름은 secure_filename()을 거친 뒤에만 경로에 쓴다.",
+      "reference": {
+        "source": "KISA 「경로 조작 및 자원 삽입」, Flask 공식 문서",
+        "pages": "",
+        "excerpt": "특히 외부의 입력이 파일명인 경우에는 필터를 적용해 경로순회(directory traversal) 공격의 위험이 있는 문자( /, \\, .. 등)를 제거해야 한다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「경로 조작 및 자원 삽입」 18쪽",
+        "easy": "사용자가 적은 파일 이름에서 다른 폴더로 옮겨 가게 만드는 글자를 먼저 없애라는 뜻이에요. secure_filename()이 이 일을 대신 해 줘요."
+      },
+      "allowed_fixes": [
+        "`secure_filename()`을 거치거나, `send_from_directory(고정 폴더, 이름)`을 쓰거나, `.`, `/`, `\\` 세 문자를 모두 제거"
+      ],
+      "forbidden_fixes": [
+        "`basename()`, `realpath`+`commonpath`, 직접 만든 필터"
+      ],
+      "fallback_example": {
+        "before": "import os\nfrom flask import Flask, request, send_file\n\napp = Flask(__name__)\n\n\n@app.route(\"/download\")\ndef download():\n    name = request.args.get(\"name\", \"\")\n    return send_file(os.path.join(\"files\", name))\n",
+        "after": "import os\nfrom flask import Flask, request, send_file\nfrom werkzeug.utils import secure_filename\n\napp = Flask(__name__)\n\n\n@app.route(\"/download\")\ndef download():\n    name = secure_filename(request.args.get(\"name\", \"\"))\n    return send_file(os.path.join(\"files\", name))\n"
+      },
+      "fallback_explanation": {
+        "problem": "사용자가 입력한 값을 파일 경로에 그대로 넣어 파일을 열고 있어요.",
+        "impact": "열어 주려던 폴더 밖의 파일까지 누구나 열어 볼 수 있어요. 입력값으로 다른 폴더를 가리킬 수 있기 때문이에요.",
+        "how_to_fix": "입력값을 secure_filename()에 통과시킨 뒤에 경로에 써요. 그러면 정해 둔 폴더 안의 파일만 열려요."
+      },
+      "_review": true
+    }
+  }
+}

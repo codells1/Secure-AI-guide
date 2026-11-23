@@ -1,0 +1,42 @@
+{
+  "vuln_id": "ssrf",
+  "name": "서버사이드 요청 위조",
+  "concept": [
+    {
+      "question": "'서버가 대신 접속한다'는 게 뭐예요?",
+      "answer": "사용자가 준 주소로 내 서버가 직접 찾아가 내용을 가져오는 거예요. 서버는 바깥에서는 들어갈 수 없는 안쪽 방에도 들어갈 수 있어요. 그래서 아무 주소나 가 주면 안 되고, 미리 정해 둔 주소에만 가야 해요.",
+      "rule_ids": [
+        "SSRF-1"
+      ],
+      "_review": true
+    }
+  ],
+  "rules": {
+    "SSRF-1": {
+      "key_sentence": "서버가 요청을 보낼 주소는 미리 정해 둔 목록에서만 고른다.",
+      "reference": {
+        "source": "KISA 「서버사이드 요청 위조」",
+        "pages": "",
+        "excerpt": "식별 가능한 범위 내에서 사용자의 입력값을 다른 시스템의 서비스 호출에 사용하는 경우, 사용자의 입력값을 화이트리스트 방식으로 필터링한다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「서버사이드 요청 위조」 55쪽",
+        "easy": "서버가 대신 접속할 주소는 미리 정해 둔 허용 목록에 있는 것만 쓰라는 뜻이에요."
+      },
+      "allowed_fixes": [
+        "상수 URL 허용 목록과 정확히 비교하고 없으면 중단, 또는 입력은 키로만 쓰고 URL은 상수 dict에서 꺼냄"
+      ],
+      "forbidden_fixes": [
+        "도메인 비교, `startswith`, 블랙리스트"
+      ],
+      "fallback_example": {
+        "before": "import requests\nfrom flask import Flask, request\n\napp = Flask(__name__)\n\n\n@app.route(\"/preview\")\ndef preview():\n    url = request.args.get(\"url\", \"\")\n    response = requests.get(url, timeout=5)\n    return response.text\n",
+        "after": "import requests\nfrom flask import Flask, request, abort\n\napp = Flask(__name__)\nSOURCES = {\n    \"weather\": \"https://api.example.com/weather\",\n    \"news\": \"https://api.example.com/news\",\n}\n\n\n@app.route(\"/preview\")\ndef preview():\n    source = request.args.get(\"source\")\n    if source not in SOURCES:\n        abort(400)\n    url = SOURCES[source]\n    response = requests.get(url, timeout=5)\n    return response.text\n"
+      },
+      "fallback_explanation": {
+        "problem": "사용자가 입력한 주소로 서버가 직접 요청을 보내고 있어요.",
+        "impact": "밖에서는 볼 수 없는 서버 안쪽의 정보가 드러날 수 있어요. 서버는 안쪽 주소에도 접속할 수 있기 때문이에요.",
+        "how_to_fix": "요청을 보낼 수 있는 주소를 미리 목록으로 정해 둬요. 입력값은 그 목록에서 고르는 데만 써요."
+      },
+      "_review": true
+    }
+  }
+}

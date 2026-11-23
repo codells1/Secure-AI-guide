@@ -153,55 +153,499 @@ body {
   display: none !important;
 }
 
-.fix-note,
-.fix-label {
+/* 강조색은 빨간색 #E5484D 하나만 쓴다 (위험 표시, 위험한 줄) */
+
+/* ---- 왼쪽 배치: 체크리스트는 내용만큼만, 그 아래 두 칸이 남는 높이를 나눠 쓴다 ---- */
+.panel-checklist {
+  flex: 0 0 auto;
+  max-height: 45%;
+}
+
+.lower {
+  position: relative; /* 피드백 팝업이 이 영역 위에 뜬다 */
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e3e5e8;
+}
+
+.panel-head h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.progress-text {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* ---- 체크리스트: 두 칸으로 놓고, 상태는 알약 모양 표시로 보여 준다 ---- */
+.checklist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #111;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item[aria-pressed="true"] {
+  background: #f3f4f6;
+}
+
+.item:disabled {
+  color: #9aa0a8;
+  cursor: default;
+}
+
+.badge {
+  flex: none;
+  min-width: 40px;
+  padding: 1px 8px;
+  border: 1px solid #c9ccd1;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.badge-waiting {
+  border-style: dashed;
+  color: #9aa0a8;
+}
+
+.badge-checking,
+.badge-question {
+  border-color: #111;
+  color: #111;
+}
+
+.badge-risk {
+  border-color: #E5484D;
+  background: #E5484D;
+  color: #fff;
+  font-weight: bold;
+}
+
+/* 문제가 있는 항목은 이름도 굵게 (색만으로 구분하지 않는다) */
+.item-risk .item-title {
+  font-weight: bold;
+}
+
+.item-extra {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.next-item {
+  margin-top: 8px;
+}
+
+/* ---- 에디터 위·아래 ---- */
+.toolbar {
+  align-items: center;
+}
+
+.file-name {
+  margin-right: auto;
+  color: #6b7280;
+  font-family: monospace;
   font-size: 13px;
 }
 
-.fix-label {
-  font-weight: 600;
+.toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
-#fix-diff {
-  height: 220px;
-  border: 1px solid #e3e5e8;
+.legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  border-top: 1px solid #e3e5e8;
+  color: #6b7280;
+  font-size: 12px;
 }
 
-#fix-detail p {
-  font-size: 14px;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-bar {
+  width: 4px;
+  height: 14px;
+  background: #E5484D;
+}
+
+.legend-viewing {
+  width: 18px;
+  border-left: 4px solid #E5484D;
+  background: rgba(229, 72, 77, 0.15);
+}
+
+/* 위험한 줄: 줄 번호 옆 막대 + 빨간 줄 번호. 지금 보고 있는 줄: 옅은 빨간 배경 + 막대 */
+.monaco-editor .risk-bar {
+  left: 0 !important;
+  width: 4px !important;
+  background: #E5484D;
+}
+
+.monaco-editor .risk-number {
+  color: #E5484D !important;
+}
+
+.monaco-editor .viewing-line {
+  background: rgba(229, 72, 77, 0.15);
+}
+
+/* [N번째 줄 보기]를 누르면 그 줄이 세 번 깜빡인다 (옅은 배경 ↔ 진한 배경).
+   이름이 둘인 것은 같은 줄에서 다시 눌러도 처음부터 깜빡이게 하려는 것이다 */
+@keyframes line-flash {
+  50% {
+    background: rgba(229, 72, 77, 0.6);
+  }
+}
+
+.monaco-editor .flash-a,
+.monaco-editor .flash-b {
+  animation: line-flash 0.6s ease-in-out 3;
+}
+
+/* ---- 피드백 팝업: 떠 있는 패널 (모달이 아니다) ---- */
+.feedback {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #c9ccd1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.feedback:focus {
+  outline: none;
+}
+
+.feedback-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e3e5e8;
+}
+
+.feedback-head h2 {
+  margin: 0 auto 0 0;
+  font-size: 16px;
+}
+
+.feedback-groups {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.icon-btn,
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #c9ccd1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.close-btn {
+  border-color: transparent;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.icon-btn:disabled,
+.ghost-btn:disabled {
+  color: #9aa0a8;
+  cursor: default;
+}
+
+/* 같은 취약점이 여러 곳일 때: "◀ 1 / 8곳 ▶"의 숫자는 굵게 */
+#feedback-group-count strong {
+  color: #111;
+}
+
+/* 말풍선이 떠 있는 동안 ◀ ▶에 빨간 테두리를 둘러 눈에 띄게 한다 */
+.feedback-groups.tip-on .icon-btn {
+  border-color: #E5484D;
+  box-shadow: 0 0 0 1px #E5484D;
+}
+
+/* 말풍선: 머리줄 바로 아래에 자기 줄을 차지한다 (단계 버튼과 설명을 가리지 않는다) */
+.tip-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 56px 0 16px; /* 오른쪽 끝을 ▶ 버튼의 오른쪽 끝에 맞춘다 */
+}
+
+.tip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #111;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
   line-height: 1.5;
 }
 
-#fix-detail .fix-label {
-  margin: 0;
-  font-size: 13px;
+/* 꼬리: ◀ ▶ 쪽(위)을 가리킨다 */
+.tip::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 56px;
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid #111;
+  border-left: 1px solid #111;
+  background: #fff;
+  transform: rotate(45deg);
 }
 
-.fix-prompt-head {
+.tip-text strong,
+.tip-text span {
+  display: block;
+}
+
+.tip .answer {
+  flex: none;
+  white-space: nowrap;
+}
+
+.feedback-steps {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 0;
 }
 
-#fix-copy-btn {
-  padding: 4px 12px;
-  border: 1px solid #000;
-  border-radius: 4px;
-  background: #000;
-  color: #fff;
+.step {
+  padding: 6px 14px;
+  border: 1px solid #c9ccd1;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
   font-size: 13px;
   cursor: pointer;
 }
 
-#fix-prompt,
-#fix-top-level-code {
-  margin: 0 0 8px;
-  padding: 8px;
-  border: 1px solid #e3e5e8;
+.step[aria-current="step"] {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+  font-weight: bold;
+}
+
+.feedback-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.feedback-body p {
+  margin: 0 0 12px;
+}
+
+.feedback-body code {
+  padding: 1px 5px;
   border-radius: 4px;
+  background: #f3f4f6;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.feedback-body hr {
+  width: 100%;
+  margin: 4px 0 12px;
+  border: 0;
+  border-top: 1px solid #e3e5e8;
+}
+
+/* 근거 자료: 근거 문서의 실제 문장(인용)과 쉬운 풀이 */
+.reference-item + .reference-item {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e5e8;
+}
+
+.feedback-body .reference-source {
+  margin: 8px 0 6px;
+  color: #6b7280;
   font-size: 12px;
+}
+
+.feedback-body blockquote {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #c9ccd1;
+  background: #f9fafb;
+  font-size: 13px;
+}
+
+.feedback-body .small-label {
+  margin: 0 0 4px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.feedback-body details {
+  margin: 0 0 8px;
+}
+
+.feedback-body summary {
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.feedback-body .reference summary {
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.feedback-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #c9ccd1;
+  border-top-color: #111;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ghost-btn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px solid #c9ccd1;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.big-btn {
+  padding: 10px 20px;
+  border: 1px solid #111;
+  border-radius: 6px;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.feedback-foot {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-top: 1px solid #e3e5e8;
+}
+
+/* ② 이렇게 고쳐요: 비교 창이 팝업 본문 높이를 거의 다 쓴다 (최소 260px) */
+#step-fix {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#feedback-diff {
+  flex: 1 1 260px;
+  min-height: 260px;
+  margin-bottom: 8px;
+  border: 1px solid #e3e5e8;
+}
+
+.general-note {
+  font-weight: bold;
+}
+
+.fix-note {
+  margin: 0 0 8px;
+  color: #4b5563;
+  font-size: 13px;
+}
+
+.prompt-preview,
+#ask-prompt,
+#fix-top-level-code {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid #e3e5e8;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.ask-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.feedback-body .copy-note {
+  margin: 0;
+  font-weight: bold;
 }

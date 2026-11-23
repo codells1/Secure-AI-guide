@@ -1,0 +1,98 @@
+{
+  "vuln_id": "sql_injection",
+  "name": "SQL 삽입",
+  "concept": [
+    {
+      "question": "'SQL 문장'이 뭐예요?",
+      "answer": "데이터베이스에게 '이 자료를 찾아 줘', '이 자료를 저장해 줘' 하고 시키는 주문서예요. 주문서에 사용자가 쓴 글을 그대로 끼워 넣으면 주문 내용 자체가 바뀔 수 있어요. 그래서 주문서 문장은 미리 정해 두고, 사용자가 쓴 글은 빈칸에 들어갈 값으로만 따로 넘겨요.",
+      "rule_ids": [
+        "SQL-1",
+        "SQL-2",
+        "SQL-3"
+      ],
+      "_review": true
+    }
+  ],
+  "rules": {
+    "SQL-1": {
+      "key_sentence": "SQL 문장은 고정해 두고, 사용자가 입력한 값은 ? 자리로 따로 넘긴다.",
+      "reference": {
+        "source": "KISA 「SQL 삽입」",
+        "pages": "9~11",
+        "excerpt": "DB API 사용 시 인자화된 쿼리를 통해 외부 입력값을 바인딩해서 사용하면 SQL 삽입 공격으로부터 안전하게 보호할 수 있다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「SQL 삽입」 9쪽",
+        "easy": "SQL 문장에는 값이 들어갈 빈칸만 만들어 두고, 사용자가 입력한 값은 그 빈칸에 따로 채워 넣으라는 뜻이에요. 그러면 무엇을 입력하든 명령이 아니라 값으로만 쓰여요."
+      },
+      "allowed_fixes": [
+        "SQL 문장은 고정하고, 값은 `?`(PyMySQL은 `%s`) 자리로 `execute()`의 두 번째 인자에 넘긴다"
+      ],
+      "forbidden_fixes": [
+        "따옴표 제거·필터 후 이어 붙이기"
+      ],
+      "fallback_example": {
+        "before": "import sqlite3\nfrom flask import Flask, request, jsonify\n\napp = Flask(__name__)\n\n\n@app.route(\"/search\")\ndef search():\n    name = request.args.get(\"name\", \"\")\n    conn = sqlite3.connect(\"app.db\")\n    rows = conn.execute(f\"SELECT name, grade FROM students WHERE name = '{name}'\").fetchall()\n    conn.close()\n    return jsonify(rows)\n",
+        "after": "import sqlite3\nfrom flask import Flask, request, jsonify\n\napp = Flask(__name__)\n\n\n@app.route(\"/search\")\ndef search():\n    name = request.args.get(\"name\", \"\")\n    conn = sqlite3.connect(\"app.db\")\n    rows = conn.execute(\"SELECT name, grade FROM students WHERE name = ?\", (name,)).fetchall()\n    conn.close()\n    return jsonify(rows)\n"
+      },
+      "fallback_explanation": {
+        "problem": "사용자가 입력한 값을 SQL 문장 안에 그대로 이어 붙이고 있어요.",
+        "impact": "다른 사람의 정보가 통째로 드러나거나 자료가 바뀔 수 있어요. 입력한 글자가 값이 아니라 명령의 일부로 읽히기 때문이에요.",
+        "how_to_fix": "SQL 문장은 고정해 두고 값이 들어갈 자리에 ?를 써요. 값은 execute()의 두 번째 칸에 따로 넘겨요."
+      },
+      "_review": true
+    },
+    "SQL-2": {
+      "key_sentence": "정렬 기준은 사용자가 입력한 글자를 그대로 쓰지 않고, 미리 정해 둔 목록에서 골라 쓴다.",
+      "reference": {
+        "source": "OWASP SQL Injection Prevention Cheat Sheet",
+        "pages": "",
+        "excerpt": "표 이름이나 열 이름, 정렬 방향을 사용자가 골라야 할 때는, 그 선택을 프로그램이 그 쿼리에 허용해 둔 몇 가지 값에 대응시키고 그 밖의 값은 모두 거부한다.",
+        "excerpt_source": "OWASP 「SQL 삽입 방지 안내서」의 '허용 목록으로 입력값 검증하기' 부분",
+        "easy": "정렬 기준처럼 사용자가 골라야 하는 값은, 프로그램이 미리 정해 둔 몇 가지 중에서만 고르게 하라는 뜻이에요. 목록에 없는 값이 오면 받아들이지 않아요.",
+        "excerpt_original_source": "OWASP SQL Injection Prevention Cheat Sheet, 'Allow-List Input Validation'",
+        "excerpt_original": "When users need to select among them, map their selection to a small set of application-owned values allowed for that query and reject anything else."
+      },
+      "allowed_fixes": [
+        "`ORDER BY` 값은 ① 상수 dict에서 꺼내거나 ② 상수 목록에 없으면 중단하거나 ③ `\"ASC\" if … else \"DESC\"`"
+      ],
+      "forbidden_fixes": [
+        "입력값을 그대로 이어 붙이기"
+      ],
+      "fallback_example": {
+        "before": "import sqlite3\nfrom flask import Flask, request, jsonify\n\napp = Flask(__name__)\n\n\n@app.route(\"/students\")\ndef students():\n    sort = request.args.get(\"sort\", \"name\")\n    conn = sqlite3.connect(\"app.db\")\n    rows = conn.execute(\"SELECT name, grade FROM students ORDER BY \" + sort).fetchall()\n    conn.close()\n    return jsonify(rows)\n",
+        "after": "import sqlite3\nfrom flask import Flask, request, jsonify\n\napp = Flask(__name__)\nSORT_COLUMNS = {\"name\": \"name\", \"grade\": \"grade\"}\n\n\n@app.route(\"/students\")\ndef students():\n    sort = SORT_COLUMNS.get(request.args.get(\"sort\"), \"name\")\n    conn = sqlite3.connect(\"app.db\")\n    rows = conn.execute(\"SELECT name, grade FROM students ORDER BY \" + sort).fetchall()\n    conn.close()\n    return jsonify(rows)\n"
+      },
+      "fallback_explanation": {
+        "problem": "정렬 기준 자리에 사용자가 입력한 값을 그대로 넣고 있어요.",
+        "impact": "데이터베이스에 있는 다른 정보까지 드러날 수 있어요. 정렬 기준 자리에 다른 명령을 섞어 넣을 수 있기 때문이에요.",
+        "how_to_fix": "쓸 수 있는 정렬 기준을 미리 목록으로 정해 둬요. 입력값은 그 목록에서 고르는 데만 써요."
+      },
+      "_review": true
+    },
+    "SQL-3": {
+      "key_sentence": "사용자 입력이 아니어도 SQL 문장에 값을 이어 붙이지 않고 ? 자리로 넘긴다.",
+      "reference": {
+        "source": "KISA 「SQL 삽입」",
+        "pages": "9~11",
+        "excerpt": "DB API 사용 시 인자화된 쿼리를 통해 외부 입력값을 바인딩해서 사용하면 SQL 삽입 공격으로부터 안전하게 보호할 수 있다.",
+        "excerpt_source": "KISA Python 시큐어코딩 가이드(2023년 개정본) 「SQL 삽입」 9쪽",
+        "easy": "SQL 문장에는 값이 들어갈 빈칸만 만들어 두고, 사용자가 입력한 값은 그 빈칸에 따로 채워 넣으라는 뜻이에요. 그러면 무엇을 입력하든 명령이 아니라 값으로만 쓰여요."
+      },
+      "allowed_fixes": [
+        "SQL 문장은 고정하고, 값은 `?`(PyMySQL은 `%s`) 자리로 `execute()`의 두 번째 인자에 넘긴다"
+      ],
+      "forbidden_fixes": [
+        "따옴표 제거·필터 후 이어 붙이기"
+      ],
+      "fallback_example": {
+        "before": "import sqlite3\nfrom flask import Flask, jsonify\n\napp = Flask(__name__)\n\n\n@app.route(\"/notice\")\ndef notice():\n    conn = sqlite3.connect(\"app.db\")\n    row = conn.execute(\"SELECT value FROM settings WHERE name = 'notice_board'\").fetchone()\n    posts = conn.execute(\"SELECT title FROM posts WHERE board = '\" + row[0] + \"'\").fetchall()\n    conn.close()\n    return jsonify(posts)\n",
+        "after": "import sqlite3\nfrom flask import Flask, jsonify\n\napp = Flask(__name__)\n\n\n@app.route(\"/notice\")\ndef notice():\n    conn = sqlite3.connect(\"app.db\")\n    row = conn.execute(\"SELECT value FROM settings WHERE name = 'notice_board'\").fetchone()\n    posts = conn.execute(\"SELECT title FROM posts WHERE board = ?\", (row[0],)).fetchall()\n    conn.close()\n    return jsonify(posts)\n"
+      },
+      "fallback_explanation": {
+        "problem": "데이터베이스에서 꺼낸 값을 SQL 문장에 문자열로 이어 붙이고 있어요.",
+        "impact": "내가 쓴 것과 다른 명령이 실행될 수 있어요. 그 값 안에 명령으로 읽히는 글자가 들어 있을 수 있기 때문이에요.",
+        "how_to_fix": "SQL 문장은 고정해 두고 값이 들어갈 자리에 ?를 써요. 값은 execute()의 두 번째 칸에 따로 넘겨요."
+      },
+      "_review": true
+    }
+  }
+}
