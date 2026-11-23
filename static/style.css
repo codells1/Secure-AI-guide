@@ -707,7 +707,8 @@ input {
 }
 
 /* ================= 첫 화면(소개 페이지) =================
-   흰 바탕, 옅은 회색 테두리 #E4E4E7, 검정 #18181B, 본문 #3F3F46, 보조 글 #52525B·#71717A.
+   공공 안내 사이트처럼 차분하게: 흰 바탕, 왼쪽 정렬 제목, 옅은 테두리의 흰 카드(모서리 16px), 옅은 회색 안내 상자.
+   글자·버튼 #1D2733, 본문 #414B58, 보조 글 #5F6A77, 테두리 #D6E0EB, 옅은 면 #EEF2F7·#FAFBFC.
    강조색은 빨간색 하나(막대·배경 #E5484D, 글자 #B42318). 그라데이션과 장식 아이콘은 쓰지 않는다. */
 html {
   scroll-behavior: smooth;
@@ -715,11 +716,13 @@ html {
 
 .landing {
   background: #fff;
-  color: #18181b;
+  color: #1d2733;
+  word-break: keep-all; /* 한글은 낱말 단위로 줄을 바꾼다 */
+  overflow-wrap: break-word;
 }
 
 .landing a {
-  color: #18181b;
+  color: #1d2733;
 }
 
 .visually-hidden {
@@ -738,9 +741,10 @@ html {
   padding-left: 24px;
 }
 
-/* 상단 메뉴 (위에 고정하지 않는다) */
+/* 상단 메뉴: 넉넉한 높이, 아래에 얇은 선 (위에 고정하지 않는다) */
 .lp-header {
-  border-bottom: 1px solid #e4e4e7;
+  border-bottom: 1px solid #d6e0eb;
+  background: #fff;
 }
 
 .lp-header-inner {
@@ -748,9 +752,9 @@ html {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
-  padding-top: 16px;
-  padding-bottom: 16px;
+  gap: 4px 16px;
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 
 .lp-logo {
@@ -759,119 +763,177 @@ html {
   justify-content: center;
   width: 44px;
   height: 44px;
+  margin-left: -6px;
+}
+
+.lp-logo svg {
+  width: 34px;
+  height: 34px;
 }
 
 .lp-nav {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 28px;
+  gap: 4px 36px;
 }
 
 .lp-nav a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: #3f3f46;
-  font-size: 15px;
+  color: #1d2733;
+  font-size: 17px;
+  font-weight: 700;
   text-decoration: none;
 }
 
 .lp-nav a:hover {
-  color: #18181b;
   text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
 }
 
+/* 버튼: 짙은 알약 모양 */
 .lp-btn,
 .lp-nav a.lp-btn {
   display: inline-flex;
   align-items: center;
   height: 44px;
-  padding: 0 20px;
-  border-radius: 8px;
-  background: #18181b;
+  padding: 0 24px;
+  border-radius: 100px;
+  background: #1d2733;
   color: #fff;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.lp-nav a.lp-btn:hover {
+  background: #000;
   text-decoration: none;
 }
 
-/* 첫 화면: 두 칸 (좁은 화면에서는 위아래로) */
+/* 통계 띠는 이전 디자인 그대로 둔다 (테두리 #E4E4E7, 검정 #18181B, 보조 글 #52525B) */
+.lp-stat {
+  color: #18181b;
+  word-break: normal;
+}
+
+/* ---- 첫 구역: 옅은 면의 큰 둥근 상자 하나에 담는다 ----
+   윗줄: 왼쪽에 제목과 설명, 오른쪽에 화면 미리보기. 아랫줄: 가로로 긴 파일 올리기 줄 */
 .lp-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 56px;
-  padding-top: 72px;
+  padding-top: 32px;
   padding-bottom: 72px;
 }
 
+.lp-hero-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "text preview"
+    "upload upload"
+    "extra extra";
+  align-items: center;
+  gap: 0 56px;
+  padding: 64px 64px 28px;
+  border-radius: 32px;
+  background: #eef2f7;
+}
+
 .lp-hero-text {
-  flex: 1 1 480px;
+  grid-area: text;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
 }
 
 .lp-hero h1 {
   margin: 0;
-  font-size: 48px;
-  font-weight: 900;
-  line-height: 1.25;
-  letter-spacing: -1.5px;
+  font-size: clamp(32px, 3.7vw, 48px);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: -0.035em;
 }
 
 .lp-lead {
-  margin: 0;
-  color: #3f3f46;
-  font-size: 18px;
+  margin: 20px 0 0;
+  color: #414b58;
+  font-size: 17px;
   line-height: 1.75;
 }
 
 .lp-lead strong {
-  color: #18181b;
+  color: #1d2733;
 }
 
-/* 파일 올리기 영역 */
+/* 파일 올리기 줄: 흰 바탕의 가로 한 줄. 왼쪽에 아이콘과 안내, 오른쪽에 버튼 */
 .dropzone {
+  grid-area: upload;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 32px 24px;
-  border: 2px dashed #a1a1aa;
-  border-radius: 14px;
-  background: #fafafa;
-  color: #3f3f46;
-  text-align: center;
+  gap: 16px;
+  margin-top: 48px;
+  padding: 16px 20px 16px 16px;
+  border: 1px solid #d6e0eb;
+  border-radius: 20px;
+  background: #fff;
+  color: #1d2733;
   cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.dropzone:hover {
+  border-color: #1d2733;
+}
+
+.dropzone svg {
+  flex: none;
+  box-sizing: content-box;
+  width: 24px;
+  height: 24px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #eef2f7;
+}
+
+.dropzone-text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .dropzone-title {
-  color: #18181b;
   font-size: 17px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .dropzone-hint {
-  color: #71717a;
-  font-size: 13px;
+  color: #5f6a77;
+  font-size: 14px;
 }
 
-/* 파일을 끌어 올렸을 때, [시작하기]로 데려왔을 때: 진한 검정 실선 */
+.dropzone-btn {
+  flex: none;
+  height: 48px;
+  padding: 0 28px;
+}
+
+/* 파일을 끌어 올렸을 때, [시작하기]로 데려왔을 때: 진한 테두리 */
 .dropzone.is-over,
 .dropzone.is-highlight {
-  border-style: solid;
-  border-color: #18181b;
+  border-color: #1d2733;
+  box-shadow: 0 0 0 1px #1d2733;
 }
 
 .dropzone.is-highlight {
-  box-shadow: 0 0 0 4px rgba(24, 24, 27, 0.14);
+  box-shadow: 0 0 0 1px #1d2733, 0 0 0 6px rgba(29, 39, 51, 0.14);
 }
 
 .dropzone:has(input:focus-visible) {
-  outline: 2px solid #18181b;
+  outline: 2px solid #1d2733;
   outline-offset: 3px;
 }
 
@@ -885,6 +947,19 @@ html {
   visibility: hidden;
 }
 
+/* 파일 올리기 줄 아래: 오류 문구와 [예시 코드로 해 보기] */
+.lp-hero-extra {
+  grid-area: extra;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 24px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
 .lp-error {
   margin: 0;
   color: #b42318;
@@ -893,29 +968,31 @@ html {
 }
 
 .lp-link {
-  align-self: flex-start;
   min-height: 44px;
+  margin-left: auto;
   padding: 0;
   border: 0;
   background: none;
-  color: #3f3f46;
+  color: #414b58;
   font-size: 15px;
-  text-decoration: underline;
   cursor: pointer;
 }
 
 .lp-link:hover {
-  color: #18181b;
+  color: #1d2733;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .lp-link:disabled {
-  color: #71717a;
+  color: #5f6a77;
+  text-decoration: none;
   cursor: progress;
 }
 
 /* 실제 화면 미리보기 (그림 역할) */
 .lp-hero-preview {
-  flex: 1 1 440px;
+  grid-area: preview;
   min-width: 0;
 }
 
@@ -1031,8 +1108,13 @@ html {
   color: #fff;
 }
 
-/* 통계 띠, 점검 항목: 옅은 회색 배경 + 위아래 테두리 */
+/* 점검 항목 구역: 다른 구역처럼 흰 바탕 */
 .lp-band {
+  background: #fff;
+}
+
+/* 통계 띠: 옅은 회색 배경 + 위아래 테두리 */
+.lp-band-stat {
   border-top: 1px solid #e4e4e7;
   border-bottom: 1px solid #e4e4e7;
   background: #fafafa;
@@ -1065,69 +1147,78 @@ html {
 }
 
 .lp-stat-main {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 20px;
   font-weight: 700;
   line-height: 1.5;
+  word-break: keep-all;
 }
 
-.lp-stat-source {
-  margin: 0;
-  color: #52525b;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-/* 구역 공통 */
+/* 구역 공통: 제목은 왼쪽에, 그 아래 카드. 구역 사이는 여백으로만 나눈다 */
 .lp-section {
-  padding-top: 88px;
-  padding-bottom: 88px;
+  padding-top: 80px;
 }
 
 .lp-section h2 {
-  margin: 0 0 12px;
-  font-size: 32px;
-  font-weight: 900;
-  letter-spacing: -1px;
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
 }
 
 .lp-sub {
-  margin: 0 0 40px;
-  color: #52525b;
+  margin: 0 0 28px;
+  color: #5f6a77;
   font-size: 17px;
   line-height: 1.6;
 }
 
 .lp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
 }
 
 .lp-grid-items {
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
-.lp-step {
+/* 카드 공통: 흰 바탕 + 옅은 테두리 + 둥근 모서리. 올리면 테두리가 진해진다 */
+.lp-step,
+.lp-item {
   display: flex;
   flex-direction: column;
+  border: 1px solid #d6e0eb;
+  border-radius: 16px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.lp-step:hover,
+.lp-item:hover {
+  border-color: #1d2733;
+}
+
+/* 진행 순서: 번호는 옅은 면의 네모 칩 */
+.lp-step {
   gap: 12px;
   padding: 28px;
-  border: 1px solid #e4e4e7;
-  border-radius: 14px;
 }
 
 .lp-step-num {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #18181b;
-  color: #fff;
-  font-size: 15px;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: #eef2f7;
+  color: #1d2733;
+  font-size: 17px;
   font-weight: 700;
 }
 
@@ -1135,30 +1226,29 @@ html {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
 .lp-step p,
 .lp-promise p {
   margin: 0;
-  color: #3f3f46;
+  color: #414b58;
   font-size: 15px;
   line-height: 1.75;
 }
 
+/* 점검 항목: 한 줄에 5개씩 */
 .lp-item {
-  display: flex;
-  flex-direction: column;
   gap: 8px;
-  padding: 20px;
-  border: 1px solid #e4e4e7;
-  border-radius: 12px;
-  background: #fff;
+  padding: 22px 20px 24px;
 }
 
 .lp-item-num {
-  color: #71717a;
+  color: #5f6a77;
   font-family: "JetBrains Mono", monospace;
   font-size: 13px;
+  font-weight: 500;
 }
 
 .lp-item h3 {
@@ -1166,32 +1256,39 @@ html {
   font-size: 16px;
   font-weight: 700;
   line-height: 1.45;
+  letter-spacing: -0.01em;
 }
 
 .lp-item p {
   margin: 0;
-  color: #3f3f46;
+  color: #5f6a77;
   font-size: 14px;
   line-height: 1.65;
 }
 
+/* 약속: 아주 옅은 면의 안내 상자 */
 .lp-promise {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px 0 4px 20px;
-  border-left: 3px solid #18181b;
+  gap: 10px;
+  padding: 28px;
+  border: 1px solid #d6e0eb;
+  border-radius: 16px;
+  background: #fafbfc;
 }
 
 .lp-promise h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
 }
 
-/* 마지막 안내 (검정 상자) */
+/* 마지막 안내: 옅은 면의 둥근 상자. 왼쪽에 문장, 오른쪽에 버튼 */
 .lp-cta-wrap {
-  padding-bottom: 88px;
+  padding-top: 80px;
+  padding-bottom: 96px;
 }
 
 .lp-cta {
@@ -1199,38 +1296,42 @@ html {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 56px 40px;
-  border-radius: 18px;
-  background: #18181b;
+  gap: 20px 32px;
+  padding: 40px 48px;
+  border-radius: 24px;
+  background: #eef2f7;
 }
 
 .lp-cta h2 {
   flex: 1 1 420px;
   min-width: 0;
   margin: 0;
-  color: #fff;
-  font-size: 30px;
-  font-weight: 900;
-  line-height: 1.35;
-  letter-spacing: -1px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
 }
 
 .landing a.lp-cta-btn {
   display: inline-flex;
   align-items: center;
   height: 52px;
-  padding: 0 28px;
-  border-radius: 10px;
-  background: #fff;
-  color: #18181b;
-  font-size: 16px;
+  padding: 0 30px;
+  border-radius: 100px;
+  background: #1d2733;
+  color: #fff;
+  font-size: 17px;
   font-weight: 700;
   text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.landing a.lp-cta-btn:hover {
+  background: #000;
 }
 
 .lp-footer {
-  border-top: 1px solid #e4e4e7;
+  border-top: 1px solid #d6e0eb;
 }
 
 .lp-footer-inner {
@@ -1239,48 +1340,96 @@ html {
   justify-content: space-between;
   gap: 8px 16px;
   padding-top: 32px;
-  padding-bottom: 32px;
-  color: #71717a;
+  padding-bottom: 40px;
+  color: #5f6a77;
   font-size: 13px;
   line-height: 1.7;
 }
 
-/* 낮은 화면(노트북 1366×768): 스크롤하지 않아도 파일 올리기 영역이 보이게 여백을 줄인다 */
-@media (max-height: 800px) {
-  .lp-hero {
-    padding-top: 40px;
-    padding-bottom: 56px;
-  }
-
-  .dropzone {
-    padding: 24px;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }
 
-/* 좁은 화면: 한 칸으로, 카드는 한 줄에 1~2개 */
+/* 낮은 화면(노트북 1366×768): 스크롤하지 않아도 파일 올리기 영역이 보이게 여백을 줄인다 */
+@media (max-height: 800px) {
+  .lp-header-inner {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .lp-hero {
+    padding-top: 24px;
+    padding-bottom: 56px;
+  }
+
+  .lp-hero-panel {
+    padding-top: 44px;
+  }
+
+  .dropzone {
+    margin-top: 36px;
+  }
+}
+
+/* 중간 폭: 점검 항목을 한 줄에 3개씩 */
+@media (max-width: 1100px) {
+  .lp-grid-items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* 좁은 화면: 한 칸으로 */
 @media (max-width: 768px) {
+  .lp-header-inner {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
   .lp-nav {
     gap: 0 20px;
   }
 
+  .lp-nav a {
+    font-size: 15px;
+  }
+
   .lp-hero {
-    gap: 32px;
-    padding-top: 40px;
-    padding-bottom: 56px;
+    padding-top: 20px;
+    padding-bottom: 48px;
   }
 
-  .lp-hero-text,
-  .lp-hero-preview {
-    flex-basis: 100%;
-  }
-
-  .lp-hero h1 {
-    font-size: 32px;
-    letter-spacing: -0.8px;
+  /* 한 칸으로: 제목 → 파일 올리기 → 예시 링크 → 화면 미리보기 */
+  .lp-hero-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "text"
+      "upload"
+      "extra"
+      "preview";
+    padding: 32px 20px 24px;
+    border-radius: 24px;
   }
 
   .lp-lead {
+    margin-top: 14px;
     font-size: 16px;
+  }
+
+  .dropzone {
+    flex-wrap: wrap;
+    margin-top: 28px;
+    padding: 16px;
+  }
+
+  .dropzone-btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .lp-hero-extra {
+    margin-bottom: 16px;
   }
 
   .preview-code {
@@ -1307,23 +1456,38 @@ html {
 
   .lp-section {
     padding-top: 56px;
-    padding-bottom: 56px;
   }
 
-  .lp-section h2,
-  .lp-cta h2 {
-    font-size: 26px;
+  .lp-section h2 {
+    font-size: 24px;
   }
 
+  .lp-sub {
+    font-size: 16px;
+  }
+
+  .lp-grid,
   .lp-grid-items {
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-step,
+  .lp-promise {
+    padding: 24px;
   }
 
   .lp-cta-wrap {
-    padding-bottom: 56px;
+    padding-top: 56px;
+    padding-bottom: 64px;
   }
 
   .lp-cta {
-    padding: 36px 24px;
+    padding: 32px 24px;
+    border-radius: 20px;
+  }
+
+  .lp-cta h2 {
+    flex-basis: 100%;
+    font-size: 22px;
   }
 }
