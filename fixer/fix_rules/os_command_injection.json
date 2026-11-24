@@ -1,6 +1,6 @@
 {
   "vuln_id": "os_command_injection",
-  "name": "운영체제 명령어 삽입",
+  "name": "OS 명령어 삽입",
   "concept": [
     {
       "question": "'운영체제 명령어'가 뭐예요?",

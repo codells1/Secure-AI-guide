@@ -114,7 +114,7 @@
           <p class="lp-sub">웹사이트를 공개했을 때 피해가 큰 서버 쪽 문제만 골랐어요.</p>
           <div class="lp-grid lp-grid-items">
             <div class="lp-item"><span class="lp-item-num">01</span><h3>SQL 삽입</h3><p>검색창에 넣은 글자로 데이터베이스를 조작할 수 있어요.</p></div>
-            <div class="lp-item"><span class="lp-item-num">02</span><h3>운영체제 명령어 삽입</h3><p>입력한 글자가 서버 컴퓨터에서 명령으로 실행돼요.</p></div>
+            <div class="lp-item"><span class="lp-item-num">02</span><h3>OS 명령어 삽입</h3><p>입력한 글자가 서버 컴퓨터에서 명령어로 실행돼요.</p></div>
             <div class="lp-item"><span class="lp-item-num">03</span><h3>위험한 형식 파일 업로드</h3><p>사진 대신 위험한 파일을 올릴 수 있어요.</p></div>
             <div class="lp-item"><span class="lp-item-num">04</span><h3>경로 조작</h3><p>서버 안의 다른 폴더에 있는 파일을 열어 볼 수 있어요.</p></div>
             <div class="lp-item"><span class="lp-item-num">05</span><h3>부적절한 인가 / IDOR</h3><p>주소의 번호만 바꾸면 남의 정보가 보여요.</p></div>
@@ -191,6 +191,27 @@
         <div id="explanation" class="panel-body"></div>
       </section>
 
+      {# 질문 카드: 위험 항목의 결과를 공개하기 전에 유도질문을 하나씩 묻는다. 피드백 팝업과 같은 자리에 뜬다 #}
+      <section id="quiz" class="quiz" role="group" aria-labelledby="quiz-title" tabindex="-1" hidden>
+        <header class="quiz-head">
+          <h2 id="quiz-title"></h2>
+          <span id="quiz-dots" class="quiz-dots" aria-hidden="true"></span>
+        </header>
+        <div class="quiz-body">
+          <div id="quiz-main"></div>
+          {# 채점 결과와 힌트: 바뀌면 화면 낭독기가 읽어 준다 #}
+          <div id="quiz-note" class="quiz-note" role="status"></div>
+          <div id="quiz-actions" class="quiz-actions"></div>
+          <div id="quiz-pick" class="quiz-pick" hidden>
+            <p class="fix-note">오른쪽 에디터에서 의심되는 줄을 드래그해 표시해요. 표시하지 않아도 돼요.</p>
+            <p class="quiz-picked">
+              <span id="quiz-picked-text"></span>
+              <button type="button" id="quiz-clear" class="ghost-btn" hidden>지우기</button>
+            </p>
+          </div>
+        </div>
+      </section>
+
       {# 피드백 팝업: 체크리스트 아래 영역 위에 뜬다. 오른쪽 에디터는 가리지 않고 배경도 덮지 않는다 #}
       <section id="feedback" class="feedback" role="dialog" aria-labelledby="feedback-title" tabindex="-1" hidden>
         <header class="feedback-head">
@@ -237,14 +258,16 @@
           </div>
 
           <div id="step-fix" hidden>
-            <p id="fix-general" class="general-note" hidden>일반 예시예요 (내 코드가 아니에요)</p>
+            <p id="fix-general" class="general-note" hidden></p>
             <div id="fix-how"></div>
-            <div id="feedback-diff"></div>
-            <p class="fix-note">예시예요. 내 코드에 자동으로 바뀌지 않아요.</p>
             <div id="fix-top-level" hidden>
-              <p class="fix-note">파일 맨 위에 이것도 추가해요:</p>
+              <p id="fix-top-level-note" class="fix-note"></p>
               <pre id="fix-top-level-code"></pre>
             </div>
+            {# 수정 코드를 어느 줄에 넣는지: 비교 창의 바뀐 곳마다 한 줄씩 #}
+            <ul id="fix-where" class="fix-where" hidden></ul>
+            <div id="feedback-diff"></div>
+            <p id="fix-example-note" class="fix-note">예시예요. 내 코드에 자동으로 바뀌지 않아요.</p>
           </div>
 
           <div id="step-ask" hidden>
@@ -277,6 +300,7 @@
     <div class="legend">
       <span class="legend-item"><span class="legend-bar"></span>위험한 줄</span>
       <span class="legend-item"><span class="legend-bar legend-viewing"></span>지금 보고 있는 줄</span>
+      <span class="legend-item"><span class="legend-bar legend-picked"></span>내가 표시한 줄</span>
     </div>
   </div>
   </div>

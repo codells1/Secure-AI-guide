@@ -5,6 +5,7 @@ const RECHECK_URL = '/api/recheck';
 const FAILED_MESSAGE = '검사하지 못했어요. 파일을 다시 올려 주세요.';
 const NO_CODE_MESSAGE = '검사할 코드가 없어요.';
 const NO_ANSWER_MESSAGE = '지금 코드에는 바꿀 답이 없어요.';
+const IDOR_DEFAULT_NOTE = '모든 페이지의 정보를 로그인한 본인만 봐야 한다고 보고 검사했어요. 누구나 봐도 되는 페이지가 있으면 알려 주세요.';
 const STEP_DELAY = 500; // 안전한 항목은 [점검 중]을 이만큼(ms) 보여 준 뒤 다음 항목으로 넘어간다
 const NEXT_LABEL = '다음 항목';
 const RISK_COLOR = '#E5484D'; // 하나뿐인 강조색 (style.css와 같은 값)
@@ -12,7 +13,7 @@ const RISK_COLOR = '#E5484D'; // 하나뿐인 강조색 (style.css와 같은 값
 // 체크리스트에 보여 줄 이름 (docs/detection_spec.md 4장의 제목)
 const VULN_TITLES = {
   sql_injection: 'SQL 삽입',
-  os_command_injection: '운영체제 명령어 삽입',
+  os_command_injection: 'OS 명령어 삽입',
   file_upload: '위험한 형식 파일 업로드',
   path_traversal: '경로 조작',
   idor: '부적절한 인가 / IDOR',
@@ -47,6 +48,14 @@ let latestRequest = 0; // 늦게 도착한 옛 응답을 버리기 위한 번호
 let reviewIndex = 0; // 지금 점검하는 항목의 순서(0부터). results.length와 같으면 모두 마친 것이다
 let revealed = new Set(); // 결과를 공개한 항목의 vuln_id
 let reviewTimer = 0; // 다음 항목으로 넘어가려고 걸어 둔 타이머
+// 유도질문: 위험 항목의 결과를 공개하기 전에 질문 5개를 하나씩 묻는다. 답과 표시한 줄은 이 변수에만 두고 저장소에는 넣지 않는다
+let guidedQuestions = {}; // vuln_id → 질문 5개. 서버가 채점표로 정답·힌트를 붙여 내려 준다
+let guidedState = new Map(); // vuln_id → { index, answers, wrongs, picked, done, summary }
+let quiz = null; // 열려 있는 질문 카드: { vulnId, stage }. 닫혀 있으면 null
+let quizTimer = 0; // "맞아요"를 보여 준 뒤 다음 질문으로 넘어가려고 걸어 둔 타이머
+let pendingFeedback = null; // 다시 검사한 결과가 오면 피드백 팝업을 열 항목 (질문 카드에서 SSRF 질문에 답했을 때)
+let pickedMarks; // 에디터에 표시해 둔 "내가 표시한 줄"
+let dragStart = null; // 에디터에서 마우스를 누른 순간의 선택 영역. 드래그로 고른 줄을 알아내는 데 쓴다
 
 require.config({
   paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' },
@@ -62,6 +71,7 @@ const editorReady = new Promise((resolve, reject) => {
       padding: { top: 12 },
       glyphMargin: true, // 위험한 줄의 막대를 줄 번호 왼쪽에 그린다
     });
+    editor.onMouseDown(() => { dragStart = editor.getSelection(); });
     resolve();
   }, reject);
 });
@@ -100,6 +110,9 @@ function resetReview() {
   ssrfAnswer = null;
   isRecheck = false;
   selectedVulnId = null;
+  guidedQuestions = {};
+  guidedState = new Map();
+  pendingFeedback = null;
 }
 
 // 새 코드로 점검을 시작한다 (첫 화면에서 올렸을 때와 에디터에 끌어다 놓았을 때 모두)
@@ -189,6 +202,13 @@ async function requestAnalysis(compare = false) {
   }
   if (requestNumber !== latestRequest) return;
 
+  // IDOR: 공개 페이지인지는 코드로 알 수 없지만 따로 묻지 않는다.
+  // 모든 페이지를 "본인만 봐야 한다"고 답한 것으로 보고 다시 검사한다. 공개 페이지는 결과가 나온 뒤 [답 바꾸기]로 알려 줄 수 있다
+  if (output.ok && answerRoutesAsPrivate(output.results)) {
+    await requestAnalysis(compare);
+    return;
+  }
+
   if (output.ok) {
     showWorkspace(); // 첫 화면에서 올렸으면 이때 작업 화면으로 바꾼다
     resultsCode = code;
@@ -197,6 +217,8 @@ async function requestAnalysis(compare = false) {
       // "다시 검사"는 하나씩 진행하지 않고 전체 결과를 비교와 함께 바로 보여 준다 (fix_spec 9장)
       reviewIndex = output.results.length;
       revealed = new Set(output.results.map((result) => result.vuln_id));
+    } else {
+      guidedQuestions = output.guided || {};
     }
     // 위험 항목이 있으면 수정 피드백을 미리 요청해 둔다 (검사한 코드와 응답 그대로).
     // 고칠 코드가 그대로인 묶음은 이전에 받은 것을 다시 쓰고 새로 요청하지 않는다
@@ -323,11 +345,13 @@ function markRiskyCode(checked) {
 function showNotice(text) {
   clearTimeout(reviewTimer);
   closeFeedback();
+  closeQuiz();
   checklistEl.replaceChildren();
   findingsEl.replaceChildren();
   explanationEl.replaceChildren();
   markRiskyCode([]);
   markLines([]);
+  markPicked([]);
   addText(checklistEl, 'p', text);
   updateToolbar();
 }
@@ -360,10 +384,16 @@ function isReviewDone() {
   return results.length > 0 && reviewIndex >= results.length;
 }
 
+// 지금 차례인 항목이 유도질문에 답하는 중인지: 위험 항목인데 질문이 남아 있어 아직 결과를 공개하지 않았다
+function isAsking() {
+  const current = results[reviewIndex];
+  return Boolean(current) && current.verdict === '위험' && !revealed.has(current.vuln_id);
+}
+
 // 지금 차례인 항목을 점검한다.
-// - 안전: [점검 중]을 잠깐 보여 준 뒤 [안전]으로 바꾸고 다음 항목으로 넘어간다
-// - 위험: 결과를 공개하고 [다음 항목]을 누를 때까지 기다린다
-// - 판정 전 질문(IDOR): 학생의 답을 기다린다. 답하면 다시 검사해서 이 함수로 돌아온다
+// - 안전: [점검 중]을 잠깐 보여 준 뒤 [안전]으로 바꾸고 다음 항목으로 넘어간다 (질문 없음)
+// - 위험: 질문 카드로 유도질문 5개를 하나씩 묻고, 다 답하면 결과를 공개한 뒤 [다음 항목]을 누를 때까지 기다린다
+// - 판정 전 질문: IDOR은 검사할 때 "본인만"으로 답해 두므로 여기 오지 않는다. 그래도 오면 아래 칸에서 답을 기다린다
 function reviewCurrent(select = true) {
   clearTimeout(reviewTimer);
   const current = results[reviewIndex];
@@ -371,9 +401,11 @@ function reviewCurrent(select = true) {
   if (current) {
     if (select) {
       selectedVulnId = current.vuln_id;
-      closeFeedback(); // 다음 항목으로 넘어가면 앞 항목의 팝업은 닫는다
+      closeFeedback(); // 다음 항목으로 넘어가면 앞 항목의 팝업과 질문 카드는 닫는다
+      closeQuiz();
     }
-    if (current.verdict === '위험' && !revealed.has(current.vuln_id)) {
+    // 유도질문을 받지 못한 항목은 묻지 않고 바로 공개한다
+    if (current.verdict === '위험' && !revealed.has(current.vuln_id) && !hasQuestionsLeft(current.vuln_id)) {
       revealed.add(current.vuln_id);
       newlyRevealed = true;
     }
@@ -386,8 +418,11 @@ function reviewCurrent(select = true) {
     }
   }
   showChecklist();
+  const openNow = Boolean(current) && (newlyRevealed || pendingFeedback === current.vuln_id);
+  pendingFeedback = null;
   // 결과를 처음 공개할 때 피드백 팝업을 연다 (왜 위험해요 → 이렇게 고쳐요 → AI에게 물어보기)
-  if (newlyRevealed) openFeedback(current.vuln_id);
+  if (openNow) openFeedback(current.vuln_id);
+  else if (isAsking()) openQuiz(current);
 }
 
 function summaryText() {
@@ -422,8 +457,10 @@ function showChecklist() {
   findingsEl.replaceChildren();
   explanationEl.replaceChildren();
   markLines([]);
+  markPicked(pickedLinesOf(selectedVulnId));
   // 위험 표시는 결과를 공개한 항목의 줄에만 한다 (아직 차례가 오지 않은 항목은 숨긴다)
   markRiskyCode(results.filter((result) => revealed.has(result.vuln_id)));
+  const asking = isAsking();
 
   if (isReviewDone()) addText(checklistEl, 'p', summaryText());
   const list = document.createElement('div');
@@ -436,7 +473,7 @@ function showChecklist() {
     row.type = 'button';
     row.className = `item item-${state}`;
     row.setAttribute('aria-pressed', String(result.vuln_id === selectedVulnId));
-    row.disabled = !shown; // 아직 공개하지 않은 항목은 열 수 없다
+    row.disabled = !shown || asking; // 아직 공개하지 않은 항목은 열 수 없다. 질문에 답하는 동안에는 다른 항목도 열 수 없다
     // 공개한 위험 항목은 고칠 곳이 몇 곳인지 함께 보여 준다
     const badge = state === 'risk'
       ? `위험 ${placeCount(result)}곳${result.acknowledged ? '·확인함' : ''}`
@@ -447,13 +484,14 @@ function showChecklist() {
     if (compared) addText(row, 'span', compared, 'item-extra');
     row.addEventListener('click', () => {
       selectedVulnId = result.vuln_id;
+      closeQuiz(); // 결과를 보여 주던 질문 카드는 닫는다
       showChecklist();
       // 위험 항목을 누르면 설명 팝업을 연다. 다른 항목을 누르면 열려 있던 팝업은 닫는다
       if (result.verdict === '위험') openFeedback(result.vuln_id);
       else closeFeedback();
     });
     list.appendChild(row);
-    // 판정 전 질문(IDOR)은 차례가 왔을 때 묻는다. 그 밖에는 공개한 항목만 보여 준다
+    // 공개한 항목만 아래 칸에 보여 준다. 판정 전 질문이 남은 항목은 차례가 왔을 때 아래 칸에서 묻는다
     if (result.vuln_id === selectedVulnId && (shown || result.verdict === null)) showFindings(result);
   });
 
@@ -484,6 +522,8 @@ function showFindings(result) {
   // 의심 코드 칸: 결과 한 줄 요약과 [설명 다시 보기]. 자세한 설명·수정 비교·프롬프트는 피드백 팝업에서 본다
   const lines = result.findings.map((finding) => `${finding.line}번째 줄${findingStatus(result, finding)}`);
   addText(findingsEl, 'p', `고칠 곳이 ${placeCount(result)}곳 있어요: ${lines.join(', ')}`);
+  // 유도질문에 답하며 표시한 줄과의 비교. 다시 검사한 뒤에는 줄 번호가 달라졌을 수 있어 보여 주지 않는다
+  if (!isRecheck) addPickSummary(findingsEl, (guidedState.get(result.vuln_id) || {}).summary);
   const again = addText(findingsEl, 'button', '설명 다시 보기', 'answer');
   again.type = 'button';
   again.addEventListener('click', () => openFeedback(result.vuln_id));
@@ -525,11 +565,21 @@ function showResolved(vulnId) {
 
 // --- 학생 응답 (스펙 5장, 5.1) ---
 
+// 판정 전 질문(IDOR)에 아직 답하지 않은 함수가 있으면 모두 "본인만 봐야 한다"로 답해 둔다. 새로 답한 것이 있으면 true
+function answerRoutesAsPrivate(newResults) {
+  const question = newResults.map((result) => result.needs_user_input).find((item) => item && item.routes);
+  const names = question ? question.routes.map((route) => route.function).filter((name) => !idorAnswers.has(name)) : [];
+  names.forEach((name) => idorAnswers.set(name, true));
+  return names.length > 0;
+}
+
 // 이미 답한 항목은 다시 묻지 않고, 학생이 원할 때 답을 바꿀 수 있는 버튼만 둔다
 function addAnswerButton(result) {
   const answered = result.vuln_id === 'idor' ? idorAnswers.size > 0 : ssrfAnswer !== null;
   const canAnswer = result.vuln_id === 'idor' ? answered : result.vuln_id === 'ssrf' && result.verdict === '위험';
   if (!canAnswer) return;
+  // IDOR은 묻지 않고 "본인만 봐야 한다"로 보고 검사했으므로, 그렇게 했다는 것과 바꾸는 방법을 알려 준다
+  if (result.vuln_id === 'idor') addText(explanationEl, 'p', IDOR_DEFAULT_NOTE);
 
   const button = addText(explanationEl, 'button', answered ? '답 바꾸기' : '답하기', 'answer');
   button.type = 'button';
@@ -559,7 +609,7 @@ async function openAnswerEditor(vulnId) {
   }
 }
 
-// IDOR: 함수마다 "본인만 봐야 하는지" 묻고, 모두 답하면 다시 검사한다
+// IDOR: 함수마다 "본인만 봐야 하는지" 묻고, 모두 답하면 다시 검사한다 ([답 바꾸기]를 눌렀을 때 코드 설명 칸에 보여 준다)
 function showIdorQuestion(question) {
   addText(explanationEl, 'p', question.question);
   markLines(question.routes.map((route) => route.line));
@@ -611,12 +661,288 @@ function showSsrfQuestion(question) {
   explanationEl.appendChild(row);
 }
 
+// ---- 유도질문 카드 (유도질문 v5). 위험 항목의 결과를 공개하기 전에 질문 5개를 하나씩 묻는다 ----
+// 카드의 단계: question ⇄ correct·retry·reveal (질문마다) → result(결과 공개) → ask(SSRF 질문)
+const CORRECT_MS = 900; // "맞아요"를 이만큼(ms) 보여 준 뒤 다음 질문으로 넘어간다
+const RETRY_LABEL = '다시 생각해 봐요';
+const CORRECT_LABEL = '✓ 맞아요';
+const ASKING_STAGES = ['question', 'correct', 'retry', 'reveal']; // 질문 5개를 묻는 단계. 이때만 줄을 표시할 수 있다
+const YES_NO = [['예', true], ['아니오', false]];
+
+const quizEl = document.getElementById('quiz');
+const quizMainEl = document.getElementById('quiz-main');
+const quizNoteEl = document.getElementById('quiz-note');
+const quizActionsEl = document.getElementById('quiz-actions');
+
+// 항목별 진행 상태: 지금 질문, 답, 오답 횟수, 표시한 줄. 다시 검사해도 유도질문은 반복하지 않는다
+function stateOf(vulnId) {
+  if (!guidedState.has(vulnId)) {
+    guidedState.set(vulnId, { index: 0, answers: [], wrongs: [], picked: new Set(), done: false, summary: null });
+  }
+  return guidedState.get(vulnId);
+}
+
+function hasQuestionsLeft(vulnId) {
+  const questions = guidedQuestions[vulnId];
+  return Array.isArray(questions) && questions.length > 0 && !stateOf(vulnId).done;
+}
+
+// 항목의 탐지 줄: 모든 finding의 path에 있는 줄 (입력을 받은 줄부터 문제가 생기는 줄까지)
+function detectedLines(result) {
+  return [...new Set(result.findings.flatMap((finding) => finding.path))].sort((a, b) => a - b);
+}
+
+// 줄 번호를 "19–21, 25"처럼 적는다 (이어지는 줄은 범위로 묶는다)
+function formatLines(lines) {
+  const ranges = [];
+  [...new Set(lines)].sort((a, b) => a - b).forEach((line) => {
+    const last = ranges[ranges.length - 1];
+    if (last && line === last[1] + 1) last[1] = line;
+    else ranges.push([line, line]);
+  });
+  return ranges.map(([start, end]) => (start === end ? `${start}` : `${start}–${end}`)).join(', ');
+}
+
+function openQuiz(result) {
+  quiz = { vulnId: result.vuln_id, stage: 'question' };
+  quizEl.hidden = false;
+  renderQuiz();
+}
+
+function closeQuiz() {
+  if (!quiz) return;
+  clearTimeout(quizTimer);
+  quiz = null;
+  quizEl.hidden = true;
+}
+
+function addQuizButton(label, onClick) {
+  const button = addText(quizActionsEl, 'button', label, 'big-btn');
+  button.type = 'button';
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+// 질문·힌트·정답 문구는 모두 textContent로만 넣는다
+function renderQuiz() {
+  clearTimeout(quizTimer);
+  const result = results.find((item) => item.vuln_id === quiz.vulnId);
+  quizMainEl.replaceChildren();
+  quizNoteEl.replaceChildren();
+  quizActionsEl.replaceChildren();
+  document.getElementById('quiz-dots').textContent = '';
+  document.getElementById('quiz-pick').hidden = !ASKING_STAGES.includes(quiz.stage);
+  // 1번째 오답은 빨간 테두리와 함께 "다시 생각해 봐요"라는 글자로도 알린다 (색만으로 알리지 않는다)
+  quizEl.classList.toggle('quiz-wrong', quiz.stage === 'retry');
+
+  let filled;
+  if (quiz.stage === 'result') filled = fillResultStage(result);
+  else if (quiz.stage === 'ask') filled = fillAskStage(result);
+  else filled = fillQuestionStage();
+  const [stageName, focusTarget] = filled;
+  document.getElementById('quiz-title').textContent = `${VULN_TITLES[quiz.vulnId] || quiz.vulnId} · ${stageName}`;
+  focusTarget.focus(); // 키보드만으로 이어서 답할 수 있게 한다
+}
+
+// 질문 하나: 한 번에 하나만 보여 주고, 위쪽에 "질문 N / 5"와 진행 점을 둔다
+function fillQuestionStage() {
+  const state = stateOf(quiz.vulnId);
+  const questions = guidedQuestions[quiz.vulnId];
+  const question = questions[state.index];
+  const number = state.index + 1;
+  document.getElementById('quiz-dots').textContent = '●'.repeat(number) + '○'.repeat(questions.length - number);
+  addText(quizMainEl, 'p', question.question);
+
+  if (quiz.stage === 'correct') {
+    addText(quizNoteEl, 'strong', CORRECT_LABEL);
+  } else if (quiz.stage === 'retry') {
+    addText(quizNoteEl, 'strong', RETRY_LABEL);
+    addMessage(quizNoteEl, question.hint); // 힌트는 정답을 직접 말하지 않는다
+  } else if (quiz.stage === 'reveal') {
+    addMessage(quizNoteEl, question.reveal);
+  }
+
+  let focusTarget = quizEl;
+  if (quiz.stage === 'reveal') {
+    focusTarget = addQuizButton(number < questions.length ? '다음 질문 ▶' : '결과 보기 ▶', nextQuestion);
+  } else {
+    YES_NO.forEach(([label, value]) => {
+      addQuizButton(label, () => answerQuestion(value)).disabled = quiz.stage === 'correct';
+    });
+  }
+  showPicked();
+  return [`질문 ${number} / ${questions.length}`, focusTarget];
+}
+
+// 채점: 채점하지 않는 질문은 답만 기록하고 넘어간다.
+// 1번째 오답은 탐지 줄을 빨갛게 강조하고 힌트와 함께 같은 질문을 다시 묻고, 2번째 오답은 정답과 이유를 알려 준다
+function answerQuestion(value) {
+  const state = stateOf(quiz.vulnId);
+  const question = guidedQuestions[quiz.vulnId][state.index];
+  state.answers[state.index] = value;
+  if (question.answer === null) {
+    nextQuestion();
+    return;
+  }
+  if (value === question.answer) {
+    quiz.stage = 'correct';
+    renderQuiz();
+    quizTimer = setTimeout(nextQuestion, CORRECT_MS);
+    return;
+  }
+  state.wrongs[state.index] = (state.wrongs[state.index] || 0) + 1;
+  quiz.stage = state.wrongs[state.index] === 1 ? 'retry' : 'reveal';
+  renderQuiz();
+  const lines = detectedLines(results.find((item) => item.vuln_id === quiz.vulnId));
+  markLines(lines, lines[0]);
+}
+
+function nextQuestion() {
+  const state = stateOf(quiz.vulnId);
+  markLines([]); // 틀렸을 때 강조한 줄은 다음 질문으로 가져가지 않는다
+  state.index += 1;
+  if (state.index < guidedQuestions[quiz.vulnId].length) {
+    quiz.stage = 'question';
+    renderQuiz();
+  } else {
+    finishQuestions();
+  }
+}
+
+// 질문이 끝나면 결과를 공개한다: 체크리스트를 "위험"으로 바꾸고 탐지 줄을 모두 빨갛게 보여 준다
+function finishQuestions() {
+  const result = results.find((item) => item.vuln_id === quiz.vulnId);
+  const state = stateOf(quiz.vulnId);
+  const lines = detectedLines(result);
+  state.done = true;
+  state.summary = {
+    found: lines.filter((line) => state.picked.has(line)),
+    missed: lines.filter((line) => !state.picked.has(line)),
+    others: [...state.picked].filter((line) => !lines.includes(line)).length,
+  };
+  revealed.add(quiz.vulnId);
+  quiz.stage = 'result';
+  showChecklist();
+  markLines(lines, lines[0]);
+  renderQuiz();
+}
+
+// 학생이 표시한 줄과 탐지 줄의 비교. 표시는 채점하지 않고, 탐지 줄이 아닌 곳을 표시한 것은 꾸짖지 않는다
+function addPickSummary(parent, summary) {
+  if (!summary) return;
+  const lineText = (lines) => (lines.length > 0 ? `${formatLines(lines)}번째 줄` : '없음');
+  if (summary.found.length === 0 && summary.others === 0) {
+    addText(parent, 'p', `표시한 줄이 없어요. 위험한 줄은 ${lineText(summary.missed)}이에요.`);
+    return;
+  }
+  [['찾은 줄', summary.found], ['놓친 줄', summary.missed]].forEach(([label, lines]) => {
+    const paragraph = document.createElement('p');
+    addText(paragraph, 'strong', `${label}: `);
+    paragraph.appendChild(document.createTextNode(lineText(lines)));
+    parent.appendChild(paragraph);
+  });
+  if (summary.others > 0) addText(parent, 'p', `다른 곳도 살펴봤어요: ${summary.others}줄`);
+}
+
+// 결과 공개: 판정, 찾은 줄과 놓친 줄. 이어서 (SSRF만) 판정 뒤 질문을 묻고, 피드백 팝업으로 넘어간다
+function fillResultStage(result) {
+  const vulnId = quiz.vulnId;
+  addText(quizMainEl, 'p', `이 항목은 위험해요. 고칠 곳이 ${placeCount(result)}곳 있어요.`);
+  addText(quizMainEl, 'p', '에디터에 빨갛게 표시된 줄이 프로그램이 찾은 위험한 줄이에요.');
+  addPickSummary(quizMainEl, stateOf(vulnId).summary);
+  if (result.needs_user_input) {
+    return ['결과', addQuizButton('다음 ▶', () => {
+      quiz.stage = 'ask';
+      renderQuiz();
+    })];
+  }
+  // 수정 묶음을 받지 못했으면 열 팝업이 없으므로 닫기만 한다
+  return ['결과', addQuizButton(groupsOf(vulnId).length > 0 ? '설명 보기 ▶' : '확인', () => {
+    closeQuiz();
+    openFeedback(vulnId);
+  })];
+}
+
+// SSRF: 탐지 모듈이 내려준 질문을 그대로 묻는다. 답하면 다시 검사하고, 결과가 오면 피드백 팝업을 연다
+function fillAskStage(result) {
+  addText(quizMainEl, 'p', result.needs_user_input.question);
+  YES_NO.forEach(([label, value]) => addQuizButton(label, () => {
+    ssrfAnswer = value;
+    pendingFeedback = quiz.vulnId;
+    requestAnalysis();
+  }));
+  return ['한 가지 더', quizEl];
+}
+
+// --- 줄 표시: 질문에 답하는 동안 에디터에서 드래그한 줄을 "표시한 줄"에 쌓는다 (선택 사항이고 채점하지 않는다) ---
+
+function pickedLinesOf(vulnId) {
+  const state = guidedState.get(vulnId);
+  return state && !isRecheck ? [...state.picked] : []; // 다시 검사한 뒤에는 줄 번호가 달라졌을 수 있다
+}
+
+// 학생이 표시한 줄: 옅은 회색 배경 + 줄 번호 오른쪽의 회색 막대. 위험한 줄의 빨간 표시와 모양이 다르다
+function markPicked(lines) {
+  if (!editor) return;
+  const lineCount = editor.getModel().getLineCount();
+  const decorations = lines
+    .filter((line) => line >= 1 && line <= lineCount)
+    .map((line) => ({
+      range: new monaco.Range(line, 1, line, 1),
+      options: { isWholeLine: true, className: 'picked-line', linesDecorationsClassName: 'picked-bar' },
+    }));
+  if (pickedMarks) {
+    pickedMarks.set(decorations);
+  } else {
+    pickedMarks = editor.createDecorationsCollection(decorations);
+  }
+}
+
+// 질문 카드의 "표시한 줄"과 에디터의 표시를 지금 상태에 맞춘다
+function showPicked() {
+  const lines = pickedLinesOf(quiz.vulnId);
+  markPicked(lines);
+  document.getElementById('quiz-picked-text').textContent = `표시한 줄: ${lines.length > 0 ? formatLines(lines) : '없음'}`;
+  document.getElementById('quiz-clear').hidden = lines.length === 0;
+}
+
+// 이번 드래그로 선택 영역이 바뀌었을 때만 그 줄들을 표시한다 (그냥 누르기만 한 것은 표시가 아니다)
+function pickSelectedLines(before) {
+  if (!quiz || !ASKING_STAGES.includes(quiz.stage)) return;
+  const selection = editor.getSelection();
+  if (!selection || selection.isEmpty() || selection.equalsSelection(before)) return;
+  // 다음 줄의 맨 앞에서 끝난 드래그는 그 줄까지 고른 것이 아니다
+  const last = selection.endColumn === 1 && selection.endLineNumber > selection.startLineNumber
+    ? selection.endLineNumber - 1
+    : selection.endLineNumber;
+  const { picked } = stateOf(quiz.vulnId);
+  for (let line = selection.startLineNumber; line <= last; line += 1) picked.add(line);
+  showPicked();
+}
+
+// 에디터 밖에서 마우스를 떼어도 드래그가 끝난 것으로 본다
+window.addEventListener('mouseup', () => {
+  if (!dragStart) return;
+  const before = dragStart;
+  dragStart = null;
+  setTimeout(() => pickSelectedLines(before), 0); // 에디터가 선택 영역을 정리한 다음에 읽는다
+});
+
+document.getElementById('quiz-clear').addEventListener('click', () => {
+  stateOf(quiz.vulnId).picked.clear();
+  showPicked();
+  quizEl.focus();
+});
+
 // ---- 수정 피드백 (fix_spec 2·3장, feedback_ui_task 2장). 결과는 이 변수에만 보관하고 저장소에는 넣지 않는다 ----
 const FIX_URL = '/api/fix';
 const FIX_PENDING_MESSAGE = '설명을 만드는 중이에요…';
 const FIX_FAILED_MESSAGE = '설명을 불러오지 못했어요.';
 const COPIED_MESSAGE = '✓ 복사됐어요! 쓰던 AI의 새 대화창에 붙여넣으세요.';
 const COPY_FAILED_MESSAGE = 'Ctrl+C를 눌러 복사하세요.';
+const GENERAL_NOTE = '일반 예시예요 (내 코드가 아니에요).';
+const TOP_LEVEL_NOTE = '파일 맨 위에 이것도 추가해요:';
+const TOP_LEVEL_ONLY_NOTE = '이 부분은 이미 고쳤어요. 파일 맨 위에 아래 줄만 추가하면 돼요:';
 const STEP_IDS = ['step-why', 'step-fix', 'step-ask']; // ① 왜 위험해요? ② 이렇게 고쳐요 ③ AI에게 물어보기
 const PREVIEW_LINES = 3;
 
@@ -624,6 +950,7 @@ const fixCache = new Map(); // 묶음의 내용 → FixResult를 기다리는 Pr
 let currentGroups = []; // 마지막 검사의 수정 묶음
 let uploadedFileName = 'app.py';
 let diffEditor = null;
+let diffFirstLine = null; // 비교 창의 첫 줄이 올린 파일에서 몇 번째 줄인지. 일반 예시면 null
 let feedback = null; // 열려 있는 피드백 팝업: { vulnId, groupIndex, step }. 닫혀 있으면 null
 let copyTimer = 0;
 let tipSeen = false; // 위치 이동 말풍선을 이미 보여 줬는지. 이 변수에만 두고 저장소에는 넣지 않는다
@@ -770,10 +1097,13 @@ async function renderFeedback() {
   }
   fixEl('feedback-status').hidden = true;
   fillWhy(result, group);
-  fillFix(result);
+  fillFix(result, group);
   fillAsk(result);
   fixEl(STEP_IDS[view.step]).hidden = false;
-  if (view.step === 1) renderDiff(result.diff.before, result.diff.after);
+  if (view.step === 1 && !onlyTopLevelLeft(result.diff)) {
+    // 내 코드의 비교는 고칠 범위가 시작하는 줄부터 번호를 매긴다. 일반 예시는 내 코드가 아니므로 번호를 보여 주지 않는다
+    renderDiff(result.diff.before, result.diff.after, result.diff.is_general_example ? null : group.target_range[0]);
+  }
 }
 
 // AI가 만든 글과 카드 문장은 모두 textContent로만 넣는다
@@ -834,17 +1164,61 @@ function fillWhy(result, group) {
   fillReferences(fixEl('why-references'), result.references);
 }
 
-// ② 이렇게 고쳐요: 고치는 방법과 수정 전후 비교
-function fillFix(result) {
-  fixEl('fix-general').hidden = !result.diff.is_general_example;
+// 고칠 범위는 이미 고쳐져 있고 파일 맨 위에 추가할 줄만 남았는지.
+// 비교 창은 줄 앞뒤 공백만 다른 줄을 표시하지 않으므로 같은 기준으로 견준다
+function onlyTopLevelLeft(diff) {
+  const shown = (text) => text.split('\n').map((line) => line.trim()).join('\n');
+  return diff.added_top_level.length > 0 && shown(diff.before) === shown(diff.after);
+}
+
+// ② 이렇게 고쳐요: 고치는 방법, 파일 맨 위에 추가할 줄, 수정 전후 비교.
+// 맨 위에 추가할 줄만 남았으면 표시가 하나도 없는 비교 창은 숨기고 그 줄만 알려 준다
+function fillFix(result, group) {
+  const onlyTopLevel = onlyTopLevelLeft(result.diff);
+  // 일반 예시는 내 파일의 코드가 아니라서 비교 창에 줄 번호가 없다. 내 코드에서 고칠 줄은 글로 알려 준다
+  const general = fixEl('fix-general');
+  general.hidden = !result.diff.is_general_example;
+  general.replaceChildren();
+  addText(general, 'strong', GENERAL_NOTE);
+  general.appendChild(document.createTextNode(` 내 코드에서는 ${formatLines(groupLines(group))}번째 줄을 이런 식으로 고쳐요.`));
   const how = fixEl('fix-how');
   how.replaceChildren();
   [...new Set(result.explanations.map((item) => item.how_to_fix))].forEach((text) => addMessage(how, text));
+  fixEl('fix-top-level-note').textContent = onlyTopLevel ? TOP_LEVEL_ONLY_NOTE : TOP_LEVEL_NOTE;
   fixEl('fix-top-level-code').textContent = result.diff.added_top_level.join('\n');
   fixEl('fix-top-level').hidden = result.diff.added_top_level.length === 0;
+  fixEl('feedback-diff').hidden = onlyTopLevel;
+  fixEl('fix-example-note').hidden = onlyTopLevel;
+  fillWhere([], null); // 어느 줄을 고치는지는 비교 창이 바뀐 곳을 계산한 뒤에 채운다
 }
 
-function renderDiff(before, after) {
+// 바뀐 곳 하나를 "몇 번째 줄에 무엇을 하는지"로 적는다. 줄 번호는 올린 파일의 번호다.
+// change는 비교 창이 계산한 바뀐 곳이다: 새 줄만 넣는 곳은 originalEndLineNumber가 0이고 originalStartLineNumber가 그 앞줄이다
+function whereText(change, firstLine) {
+  const fileLine = (line) => line + firstLine - 1;
+  if (change.originalEndLineNumber === 0) {
+    return change.originalStartLineNumber === 0
+      ? `${fileLine(1)}번째 줄 위에 초록색 줄(+)을 넣어요.`
+      : `${fileLine(change.originalStartLineNumber)}번째 줄 아래에 초록색 줄(+)을 넣어요.`;
+  }
+  const lines = change.originalStartLineNumber === change.originalEndLineNumber
+    ? `${fileLine(change.originalStartLineNumber)}번째 줄`
+    : `${fileLine(change.originalStartLineNumber)}~${fileLine(change.originalEndLineNumber)}번째 줄`;
+  return change.modifiedEndLineNumber === 0 ? `${lines}을 지워요.` : `${lines}을 초록색 줄(+)로 바꿔요.`;
+}
+
+// 비교 창 위에, 수정 코드를 어느 줄에 넣는지 글로 알려 준다 (색만 보고 위치를 짐작하지 않게).
+// 일반 예시(firstLine이 null)는 내 코드가 아니므로 적지 않는다
+function fillWhere(changes, firstLine) {
+  const list = fixEl('fix-where');
+  list.replaceChildren();
+  if (firstLine !== null) changes.forEach((change) => addText(list, 'li', whereText(change, firstLine)));
+  list.hidden = list.children.length === 0;
+}
+
+// 줄 번호는 한 줄만 보여 준다: 올린 파일(오른쪽 에디터)의 줄 번호다. 새로 넣을 줄에는 번호 없이 + 표시만 있다.
+// firstLine은 비교 창의 첫 줄이 올린 파일에서 몇 번째 줄인지다. 일반 예시(null)는 내 코드가 아니므로 번호를 보여 주지 않는다
+function renderDiff(before, after, firstLine) {
   if (!diffEditor) {
     diffEditor = monaco.editor.createDiffEditor(fixEl('feedback-diff'), {
       readOnly: true,
@@ -852,7 +1226,15 @@ function renderDiff(before, after) {
       automaticLayout: true,
       minimap: { enabled: false },
     });
+    // 한 창에 겹쳐 보여 줄 때 왼쪽 번호는 고치기 전 코드, 오른쪽 번호는 고친 뒤 코드의 것이다. 고친 뒤의 번호는 끈다
+    diffEditor.getModifiedEditor().updateOptions({ lineNumbers: 'off' });
+    // 바뀐 곳은 코드를 넣은 뒤에 계산된다. 계산이 끝나면 어느 줄을 고치는지 적는다
+    diffEditor.onDidUpdateDiff(() => fillWhere(diffEditor.getLineChanges() || [], diffFirstLine));
   }
+  diffFirstLine = firstLine;
+  diffEditor.getOriginalEditor().updateOptions({
+    lineNumbers: firstLine === null ? 'off' : (line) => String(line + firstLine - 1),
+  });
   const previous = diffEditor.getModel();
   diffEditor.setModel({
     original: monaco.editor.createModel(before, 'python'),

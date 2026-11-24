@@ -31,7 +31,7 @@ class EndpointTest(unittest.TestCase):
 class AnalyzeGroupsTest(EndpointTest):
     def test_analysis_keeps_its_result_and_adds_groups(self):
         body = self.analyze(CODE).get_json()
-        self.assertEqual(list(body), ["ok", "results", "groups"])
+        self.assertEqual(list(body), ["ok", "results", "groups", "guided"])
         self.assertEqual(len(body["results"]), 10)  # 탐지 결과는 그대로다
         self.assertEqual([group["group_id"] for group in body["groups"]], ["hardcoded_secret:5-5", "sql_injection:8-13"])
         secret, sql = body["groups"]

@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from flask import Flask, current_app, jsonify, render_template, request
 
+import guided
 from detector import analyze
 from fixer import recheck
 from fixer import service as fix_service
@@ -43,7 +44,7 @@ def analyze_code():
         app.logger.error("ANALYZE-01")
         return _error(FAILED_MESSAGE, 500)
     if result.get("ok"):
-        result = {**result, "groups": _fix_groups(data["code"], result)}
+        result = {**result, "groups": _fix_groups(data["code"], result), "guided": _guided(data["code"], result)}
     return jsonify(result)
 
 
@@ -54,6 +55,15 @@ def _fix_groups(code, result):
     except Exception:
         app.logger.error("GROUPS-01")
         return []
+
+
+def _guided(code, result):
+    """위험 항목의 유도질문 5개와 정답. 여기서 문제가 생겨도 탐지 결과는 그대로 돌려준다 (질문 없이 진행한다)."""
+    try:
+        return guided.describe(code, result)
+    except Exception:
+        app.logger.error("GUIDED-01")
+        return {}
 
 
 def _error(message, status):
