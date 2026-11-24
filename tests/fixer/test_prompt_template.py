@@ -69,7 +69,7 @@ class PromptTemplateTest(unittest.TestCase):
                         self.assertIn(load_card(vuln_id, [rule_id]).allowed_fixes[0], prompt)
                         self.assertTrue(prompt.endswith("\n".join(CONDITIONS)))
                 count += 1
-        self.assertEqual(count, 32)
+        self.assertEqual(count, 30)
 
     def test_without_fix_instruction_the_line_is_removed(self):
         for missing in (None, "", "   \n "):

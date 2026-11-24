@@ -38,8 +38,8 @@ def search():
     return "ok"
 '''
 
-SQL_AND_SSTI_ONE_FUNCTION = '''import sqlite3
-from flask import Flask, request, render_template_string
+SQL_AND_COMMAND_ONE_FUNCTION = '''import os, sqlite3
+from flask import Flask, request
 
 app = Flask(__name__)
 
@@ -49,7 +49,7 @@ def hello():
     name = request.args.get("name", "")
     conn = sqlite3.connect("users.db")
     conn.execute(f"SELECT id FROM users WHERE name = '{name}'")
-    return render_template_string("<h1>" + name + "</h1>")
+    return str(os.system("echo " + name))
 '''
 
 DECORATORS = '''import sqlite3
@@ -165,10 +165,10 @@ class GroupingTest(unittest.TestCase):
         self.assertEqual([finding["line"] for finding in group.findings], [13, 14])
 
     def test_different_vulns_in_one_function_stay_separate(self):
-        groups = groups_of(SQL_AND_SSTI_ONE_FUNCTION)
+        groups = groups_of(SQL_AND_COMMAND_ONE_FUNCTION)
         self.assertEqual(summary(groups), [
             ("sql_injection:7-12", ("SQL-1",), "hello"),
-            ("ssti:7-12", ("SSTI-1",), "hello"),
+            ("os_command_injection:7-12", ("CMD-1",), "hello"),
         ])
 
     def test_range_starts_at_first_decorator(self):

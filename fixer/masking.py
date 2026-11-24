@@ -1,13 +1,9 @@
 """민감정보 가리기 (fix_spec 4장). 외부로 보내거나 화면에 보여 줄 사본을 만든다.
 
 새 탐지 규칙을 만들지 않는다. 탐지 모듈의 하드코딩 규칙(KEY-1~4)이 찾은 값만 가린다.
-finding에는 줄 번호만 있고 값의 위치는 없으므로, 탐지 모듈이 쓰는 함수로 같은 값을 다시 찾는다.
-그래서 이 파일은 detector.rules.hardcoded_secret의 내부 함수와 StaticStrings._table_for에 의존한다.
-그쪽 구조가 바뀌면 가리지 않고 MaskingError를 낸다.
+finding에는 줄 번호만 있고 값의 위치는 없으므로, 탐지 모듈의 같은 규칙으로 값을 다시 찾는다
+(detector.rules.hardcoded_secret의 secret_values, literal_nodes).
 """
-import ast
-
-from detector.astutil import iter_nodes_with_scope
 from detector.rules import hardcoded_secret as _rule
 from detector.source import SourceSyntaxError, parse_source
 
@@ -16,7 +12,7 @@ from .grouping import normalize
 MASK_VALUE = "***"
 MASK_LITERAL = '"***"'
 MASK_COMMENT = "# (가린 주석)"
-COMMENT_RULE = "KEY-4"
+COMMENT_RULE = _rule.COMMENT_RULE
 
 
 class MaskingError(Exception):
@@ -86,42 +82,13 @@ def _mask(text, wanted):
 
 
 def _flagged_values(source):
-    """탐지 모듈이 KEY-1~3으로 보고하는 값 노드를 (rule_id, 값 노드, 스코프)로 돌려준다.
-
-    hardcoded_secret.check()와 같은 순서로 같은 함수를 불러서, 판단은 탐지 모듈이 한다.
-    """
-    flagged = []
-    for node, scope in iter_nodes_with_scope(source.tree):
-        for rule_id, value in _rule._secret_slots(node, source.names):
-            for finding in _rule._slot_findings(source, rule_id, value, scope):
-                # KEY-3이면 걸린 것은 값이 아니라 os.getenv(...)의 기본값이다.
-                literal = _rule._env_default(source, value) if finding.rule_id != rule_id else value
-                flagged.append((finding.rule_id, literal, scope))
-        if isinstance(node, ast.Call):
-            for finding in _rule._env_name_findings(source, node, scope):
-                flagged.append((finding.rule_id, _rule._env_default(source, node), scope))
-    return flagged
+    """탐지 모듈이 KEY-1~3으로 보고하는 값 노드를 (rule_id, 값 노드, 스코프)로 돌려준다. 판단은 탐지 모듈이 한다."""
+    return [(secret.rule_id, secret.node, secret.scope) for secret in _rule.secret_values(source)]
 
 
 def _literal_nodes(source, root, scope):
     """정적 문자열 root를 이루는 리터럴 노드들. 이름은 대입된 곳까지 따라간다."""
-    found, seen, stack = [], set(), [(root, scope)]
-    while stack:
-        node, node_scope = stack.pop()
-        if isinstance(node, ast.Constant):
-            if isinstance(node.value, (str, bytes)) and node.value:
-                found.append(node)
-            continue
-        if isinstance(node, ast.Name):
-            table = source.static._table_for(node.id, node_scope)
-            if (id(table), node.id) not in seen:
-                seen.add((id(table), node.id))
-                stack.extend(table.values.get(node.id, ()))  # (값 노드, 그 값을 계산하는 함수)
-            continue
-        if isinstance(node, ast.JoinedStr):
-            found.append(node)  # f-string 안쪽 조각은 따로 바꿀 수 없어 전체를 가린다
-        stack.extend((child, node_scope) for child in ast.iter_child_nodes(node))
-    return found
+    return _rule.literal_nodes(source, root, scope)
 
 
 def _outermost(spans):
@@ -153,6 +120,6 @@ def _verify(text, masked, wanted):
     if remaining != {item for item in wanted if item[0] != COMMENT_RULE}:
         raise MaskingError("가린 뒤 탐지 결과가 달라졌습니다.")
     for _, node, scope in _flagged_values(source):
-        parts = source.static.literal_parts(node, scope) or []
+        parts = [part for part in source.static.parts(node, scope) or [] if isinstance(part, (str, bytes))]
         if any(part and part not in (MASK_VALUE, MASK_VALUE.encode()) for part in parts):
             raise MaskingError("가려지지 않은 값이 남아 있습니다.")

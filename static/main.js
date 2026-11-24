@@ -12,7 +12,7 @@ const RISK_COLOR = '#E5484D'; // 하나뿐인 강조색 (style.css와 같은 값
 // 체크리스트에 보여 줄 이름 (docs/detection_spec.md 4장의 제목)
 const VULN_TITLES = {
   sql_injection: 'SQL 삽입',
-  ssti: '서버사이드 템플릿 삽입',
+  os_command_injection: '운영체제 명령어 삽입',
   file_upload: '위험한 형식 파일 업로드',
   path_traversal: '경로 조작',
   idor: '부적절한 인가 / IDOR',

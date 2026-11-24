@@ -1,4 +1,4 @@
-"""취약점 규칙 10종. 스펙 4장 순서대로 둔다.
+"""취약점 규칙 10종. 스펙 1장의 순서대로 둔다.
 
 규칙 모듈은 `VULN_ID`와 `check(source)`를 가진다.
 - 학생 응답을 받아야 판정할 수 있는 규칙은 `check` 대신 `evaluate(source, user_input)`를 가진다.
@@ -11,16 +11,16 @@ from . import (
     hardcoded_secret,
     idor,
     login_attempt_limit,
+    os_command_injection,
     password_storage,
     path_traversal,
     sql_injection,
     ssrf,
-    ssti,
 )
 
 RULES = (
     sql_injection,
-    ssti,
+    os_command_injection,
     file_upload,
     path_traversal,
     idor,

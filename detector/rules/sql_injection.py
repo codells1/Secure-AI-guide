@@ -2,65 +2,59 @@
 import re
 
 from ..result import Finding
-from ..taint import Kind, Sink, TaintSpec, find_sink_hits, register
+from ..values import EXTERNAL, S, T, U
+from .common import covered, flow_finding
 
 VULN_ID = "sql_injection"
 
-# 도착점: .execute(), .executemany(), .executescript()의 1번째 인자(쿼리)
-SPEC = register(
-    TaintSpec(
-        vuln_id=VULN_ID,
-        sinks=tuple(
-            Sink(method=method, arg=0, keywords=("query", "sql", "operation"))
-            for method in ("execute", "executemany", "executescript")
-        ),
-    )
-)
+EXECUTE_METHODS = frozenset({"execute", "executemany", "executescript", "raw"})
+TEXT_FUNCTIONS = frozenset({"sqlalchemy.text", "sqlalchemy.sql.text", "sqlalchemy.sql.expression.text"})
+QUERY_KEYWORDS = ("sql", "query", "operation", "statement", "raw_query", "text")
 
-# 정렬 예외로 인정하는 값: 상수 dict 매핑, 상수 목록 검사 (스펙 3.6).
-# 참/거짓 → 고정 문자열(`"ASC" if … else "DESC"`)은 정적이라 여기까지 오지 않는다 (스펙 3.4).
-ORDER_BY_CHOICES = frozenset({"dict_get", "dict_subscript", "guard"})
+_ORDER_BY = re.compile(r"\border\s+by\s+(?:[\w.`\"]+\s*(?:asc|desc)?\s*,\s*)*$", re.IGNORECASE)
 
-_ORDER_BY = re.compile(r"\border\s+by\b", re.IGNORECASE)
-# ORDER BY 뒤에 이 낱말이 나오면 정렬 절은 끝난 것이다. LIMIT 등 정렬 외 위치의 조립은 예외 없이 위험하다.
-_CLAUSE_END = re.compile(
-    r"\b(limit|offset|fetch|union|intersect|except|select|from|where|group|having|into|values|set)\b|;",
-    re.IGNORECASE,
-)
+
+def _query(event):
+    """이 호출이 SQL 문장을 실행하는 자리면 그 문장의 값."""
+    if event.method in EXECUTE_METHODS or event.name in TEXT_FUNCTIONS:
+        for keyword in QUERY_KEYWORDS:
+            if keyword in event.kwargs:
+                return event.kwargs[keyword]
+        return event.args[0] if event.args else None
+    return None
 
 
 def check(source):
+    program = source.flow
     findings = []
-    for hit in find_sink_hits(source, SPEC):
-        if hit.call_line is not None and not hit.exact:
-            continue  # 매개변수를 섞어 조립하는 헬퍼는 그 함수 안에서 SQL-3으로 판정한다
-        findings.extend(_judge(hit))
+    for event in program.calls:
+        query = _query(event)
+        if query is None:
+            continue
+        for alt in query.alts:
+            external = False
+            for atom in alt:
+                if isinstance(atom, T) and atom.taint.has(EXTERNAL) and not covered(atom.taint, event.facts):
+                    external = True
+                    rule_id = "SQL-2" if _ORDER_BY.search(atom.taint.before or "") else "SQL-1"
+                    findings.append(flow_finding(program, event, atom.taint, rule_id))
+            if external:
+                continue
+            # 사용자 입력이 아니어도, 고정 문장에 고정이 아닌 값을 이어 붙였으면 SQL-3
+            has_text = any(isinstance(atom, S) and atom.text.strip() for atom in alt)
+            dynamic = [atom for atom in alt if isinstance(atom, U)]
+            if has_text and dynamic:
+                findings.append(Finding(_built_line(event, dynamic), "SQL-3"))
     return findings
 
 
-def _judge(hit):
-    """쿼리 자리에 올 수 있는 값들을 보고 규칙을 정한다."""
-    paths = {}  # rule_id → 처음 찾은 조각의 path
-    for value in hit.values:
-        prefix = ""  # 지금 조각보다 앞에 있는 리터럴 글자
-        for part in value:
-            if part.kind is Kind.STATIC:
-                prefix += part.text
-                continue
-            sorting = _in_order_by(prefix)
-            if part.kind is Kind.TAINTED:
-                rule_id = "SQL-2" if sorting else "SQL-1"
-            elif part.kind is Kind.CHOICE and sorting and part.tags & ORDER_BY_CHOICES:
-                continue  # 정렬 예외
-            else:
-                rule_id = "SQL-3"  # 사용자 입력은 아니지만 쿼리가 동적이다
-            paths.setdefault(rule_id, hit.path(part))
-    if len(paths) > 1:
-        paths.pop("SQL-3", None)  # 사용자 입력이 섞였으면 SQL-1·SQL-2로 보고한다
-    return [Finding(hit.report_line, rule_id, path) for rule_id, path in paths.items()]
-
-
-def _in_order_by(prefix):
-    """prefix 바로 다음 자리가 ORDER BY 절 안인지."""
-    matches = list(_ORDER_BY.finditer(prefix))
-    return bool(matches) and not _CLAUSE_END.search(prefix, matches[-1].end())
+def _built_line(event, atoms):
+    """이어 붙인 함수가 도착점까지 값을 넘긴 줄 (스펙 3.4)."""
+    here = id(event.function) if event.function is not None else 0
+    owners = {int(mark[6:]) for atom in atoms for mark in atom.marks if mark.startswith("owner:")}
+    if not event.stack or here in owners or not owners:
+        return event.line
+    for function_id, call_line in event.stack:
+        if function_id in owners:
+            return call_line
+    return event.stack[0][1]

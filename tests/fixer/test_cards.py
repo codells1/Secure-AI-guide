@@ -13,7 +13,6 @@ from fixer.cards import RULES_DIR, CardError, card_files, card_problems, load_ca
 
 # IDOR은 학생이 답해야 판정한다. 후보 라우트를 모두 "본인만 봐야 한다"고 답한 상태로 검사한다.
 USER_INPUT = {"idor": {"public_functions": []}}
-OWASP_SSTI = "OWASP Server-Side Template Injection Prevention Cheat Sheet"
 
 # 3부 해결법 표 (fix_methods v1.1). 강조 표시(**)만 빼고 그대로 옮긴 것.
 # (규칙들, 이렇게 고친다, 이렇게 고치면 안 된다, 근거, 쪽)
@@ -24,12 +23,12 @@ TABLE = [
     (("SQL-2",),
      "`ORDER BY` 값은 ① 상수 dict에서 꺼내거나 ② 상수 목록에 없으면 중단하거나 ③ `\"ASC\" if … else \"DESC\"`",
      "입력값을 그대로 이어 붙이기", "OWASP SQL Injection Prevention Cheat Sheet", ""),
-    (("SSTI-1", "SSTI-3", "SSTI-4"),
-     "템플릿 원본은 고정하고(템플릿 파일 + `render_template`), 값은 키워드 인자로만 넘긴다",
-     "`{{`, `{%`를 지우는 필터", OWASP_SSTI, ""),
-    (("SSTI-2",),
-     "템플릿 이름은 ① 상수 dict에서 고르거나 ② 상수 목록에 없으면 중단한다",
-     "입력값으로 파일 이름 만들기", OWASP_SSTI, ""),
+    (("CMD-1",),
+     "입력값이 상수 허용 목록에 없으면 중단하거나, 특수문자를 모두 지운 뒤 `shell=True` 없이 명령과 인자를 리스트로 넘긴다",
+     "입력값을 그대로 명령어에 이어 붙이기, 특수문자 일부만 지우기", "KISA 「운영체제 명령어 삽입」", "29~32"),
+    (("CMD-2",),
+     "`shell=True`를 지우고 명령과 인자를 리스트로 넘긴다, 또는 입력값이 상수 허용 목록에 없으면 중단한다",
+     "특수문자만 지우고 `shell=True`는 그대로 두기", "KISA 「운영체제 명령어 삽입」", "29~32"),
     (("UP-1", "UP-2"),
      "`save()` 전에 ① 확장자 허용 목록과 ② Content-Type 허용 목록을 둘 다 확인하고, 실패하면 중단",
      "`\"jpg\" in filename`, 확장자만 검사(Flask 공식 예시), `mimetype.startswith(\"image/\")`",
@@ -92,7 +91,7 @@ def risky(code):
 class CardFilesTest(unittest.TestCase):
     def test_every_detector_rule_has_a_card(self):
         self.assertEqual(sorted(rule_id for _, rule_id, _ in raw_rules()), sorted(MESSAGES))
-        self.assertEqual(len(MESSAGES), 32)
+        self.assertEqual(len(MESSAGES), 30)
 
     def test_file_names_are_the_detector_vuln_ids(self):
         self.assertEqual(card_files(), sorted(rule.VULN_ID for rule in RULES))
@@ -224,7 +223,7 @@ class LoadCardTest(unittest.TestCase):
 
     def test_english_sources_are_shown_in_korean(self):
         """영어 문서(OWASP)가 근거인 규칙은 우리말로 옮긴 문장을 보여 주고, 옮긴 글임을 표시한다."""
-        for vuln_id, rule_id in (("sql_injection", "SQL-2"), ("ssti", "SSTI-1"), ("ssti", "SSTI-2"), ("ssti", "SSTI-3"), ("ssti", "SSTI-4")):
+        for vuln_id, rule_id in (("sql_injection", "SQL-2"),):
             with self.subTest(rule_id):
                 (reference,) = load_card(vuln_id, [rule_id]).references
                 self.assertIs(reference["translated"], True)
